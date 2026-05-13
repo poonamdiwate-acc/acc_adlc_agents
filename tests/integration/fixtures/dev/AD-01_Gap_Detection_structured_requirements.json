@@ -1,0 +1,270 @@
+{
+  "run_id": "{run_id}",
+  "agent_id": "AD-01",
+  "phase": "plan",
+  "structured_requirements": [
+
+    {
+      "req_id": "REQ-001",
+      "name": "AI Job Portal Platform",
+      "category": "business_goal",
+      "description": "Develop an AI Job Portal Application that streamlines the recruitment process for AI and machine learning roles, connecting qualified candidates with relevant opportunities and enabling recruiters to efficiently manage and review applications.",
+      "source": "section_1_business_goal"
+    },
+    {
+      "req_id": "REQ-002",
+      "name": "Role-Based Access",
+      "category": "functional",
+      "description": "The portal must support role-based access for two user types: Candidate and Recruiter. Each role has distinct features — candidates apply for roles, recruiters manage applications.",
+      "source": "section_1_business_goal"
+    },
+    {
+      "req_id": "REQ-003",
+      "name": "Candidate Application Workflow",
+      "category": "functional",
+      "description": "Candidates must be able to register, upload resumes, select a job position from a dropdown of AI roles, and submit an application including resume and job selection.",
+      "source": "section_2_workflow"
+    },
+    {
+      "req_id": "REQ-004",
+      "name": "Recruiter Dashboard Workflow",
+      "category": "functional",
+      "description": "Recruiters must be able to securely log in, access a dashboard showing all submitted applications, sort and paginate results, and download candidate resumes.",
+      "source": "section_2_workflow"
+    },
+    {
+      "req_id": "REQ-005",
+      "name": "Application Confirmation",
+      "category": "functional",
+      "description": "On successful application submission, the system must generate a confirmation message and a unique application reference number for the candidate.",
+      "source": "section_2_workflow"
+    },
+
+    {
+      "req_id": "REQ-006",
+      "name": "Registration Agent (A1)",
+      "category": "agent",
+      "description": "Handles user registration, role selection (Candidate or Recruiter), and credential setup. Presents registration form, validates email and password strength, and creates user profile in User DB.",
+      "agent_id": "A1",
+      "tasks": ["T1", "T2", "T3"],
+      "inputs": ["Registration form data (role, email, password)"],
+      "outputs": ["User profile with role, credentials"],
+      "tools": ["User DB", "Validation functions"],
+      "dependencies": [],
+      "source": "section_3_agents"
+    },
+    {
+      "req_id": "REQ-007",
+      "name": "Authentication Agent (A2)",
+      "category": "agent",
+      "description": "Manages secure login and session management for both candidates and recruiters. Authenticates credentials, initiates session tokens, and enforces role-based access control.",
+      "agent_id": "A2",
+      "tasks": ["T4", "T5", "T6"],
+      "inputs": ["Login credentials (email, password)"],
+      "outputs": ["Authenticated session token", "User context"],
+      "tools": ["Auth service", "Session manager"],
+      "dependencies": ["A1"],
+      "source": "section_3_agents"
+    },
+    {
+      "req_id": "REQ-008",
+      "name": "Resume Upload Agent (A3)",
+      "category": "agent",
+      "description": "Processes resume uploads by candidates. Accepts PDF, DOC, DOCX files up to 5 MB, validates file type and size, stores the file, generates a preview link, and provides upload progress feedback.",
+      "agent_id": "A3",
+      "tasks": ["T7", "T8", "T9", "T10"],
+      "inputs": ["Resume file (PDF/DOC/DOCX)", "User session"],
+      "outputs": ["Stored resume metadata", "Upload status", "Preview link"],
+      "tools": ["File storage", "File validator", "Preview builder"],
+      "dependencies": ["A2"],
+      "source": "section_3_agents"
+    },
+    {
+      "req_id": "REQ-009",
+      "name": "Job Selection Agent (A4)",
+      "category": "agent",
+      "description": "Presents a dropdown menu of AI job positions to the candidate, validates the selection, ensures mandatory field completion, and attaches the selected job to the application context.",
+      "agent_id": "A4",
+      "tasks": ["T11", "T12", "T13"],
+      "inputs": ["User session", "Job dropdown request"],
+      "outputs": ["Selected job position", "Validated selection"],
+      "tools": ["Job DB", "Dropdown UI", "Validation functions"],
+      "dependencies": ["A2"],
+      "source": "section_3_agents"
+    },
+    {
+      "req_id": "REQ-010",
+      "name": "Application Submission Agent (A5)",
+      "category": "agent",
+      "description": "Aggregates resume metadata and job selection, validates all mandatory fields, creates the application record in Application DB, and generates a confirmation message with a unique reference number.",
+      "agent_id": "A5",
+      "tasks": ["T14", "T15", "T16", "T17"],
+      "inputs": ["Resume metadata", "Selected job", "User session"],
+      "outputs": ["Application record", "Confirmation message", "Reference number"],
+      "tools": ["Application DB", "Reference generator"],
+      "dependencies": ["A3", "A4"],
+      "source": "section_3_agents"
+    },
+    {
+      "req_id": "REQ-011",
+      "name": "Recruiter Dashboard Agent (A6)",
+      "category": "agent",
+      "description": "Retrieves and displays submitted applications for recruiters. Supports sorting, pagination (20 records per page), shows candidate name, applied position, submission date, and status, and provides a resume download option per record.",
+      "agent_id": "A6",
+      "tasks": ["T18", "T19", "T20", "T21"],
+      "inputs": ["Recruiter session", "Application query params"],
+      "outputs": ["Paginated/sorted application list", "Candidate details"],
+      "tools": ["Application DB", "Sorting/Pagination functions"],
+      "dependencies": ["A2", "A5"],
+      "source": "section_3_agents"
+    },
+    {
+      "req_id": "REQ-012",
+      "name": "Resume Download Agent (A7)",
+      "category": "agent",
+      "description": "Handles secure download of candidate resumes by authenticated recruiters. Authenticates recruiter access, retrieves the resume file from storage, and streams it securely.",
+      "agent_id": "A7",
+      "tasks": ["T22", "T23", "T24"],
+      "inputs": ["Resume download request", "Recruiter session"],
+      "outputs": ["Resume file (download stream)"],
+      "tools": ["File storage", "Access control"],
+      "dependencies": ["A6"],
+      "source": "section_3_agents"
+    },
+
+    {
+      "req_id": "REQ-013",
+      "name": "Registration Failure Handling",
+      "category": "failure_handling",
+      "description": "If registration fails due to invalid input, display specific error messages and prompt for correction. On authentication failure, allow up to 3 retry attempts before locking the account for 15 minutes.",
+      "source": "section_6_failure_handling"
+    },
+    {
+      "req_id": "REQ-014",
+      "name": "Resume Upload Failure Handling",
+      "category": "failure_handling",
+      "description": "If file type or size is invalid, reject the upload and show a clear error message. On storage failure, retry once; if unsuccessful, notify the user and log the incident for admin review.",
+      "source": "section_6_failure_handling"
+    },
+    {
+      "req_id": "REQ-015",
+      "name": "Job Selection and Submission Failure Handling",
+      "category": "failure_handling",
+      "description": "If the job dropdown fails to load, retry twice and fall back to a static list. On submission failure, preserve entered data and prompt the user to retry.",
+      "source": "section_6_failure_handling"
+    },
+    {
+      "req_id": "REQ-016",
+      "name": "Dashboard and Download Failure Handling",
+      "category": "failure_handling",
+      "description": "If dashboard data retrieval fails, retry twice and display a maintenance notice if unresolved. If resume download fails, log the error and notify the recruiter with alternative contact instructions.",
+      "source": "section_6_failure_handling"
+    },
+    {
+      "req_id": "REQ-017",
+      "name": "System-Wide Error Logging",
+      "category": "failure_handling",
+      "description": "All critical errors must be logged with timestamps and user context for audit. Users are shown generic error messages and provided support contact details.",
+      "source": "section_6_failure_handling"
+    },
+
+    {
+      "req_id": "REQ-018",
+      "name": "Performance — Response Time",
+      "category": "non_functional",
+      "sub_category": "performance",
+      "description": "Portal must respond to user actions within 2 seconds for 95% of requests. Resume upload and download operations must complete within 10 seconds.",
+      "source": "section_7_governance"
+    },
+    {
+      "req_id": "REQ-019",
+      "name": "Security — Password and Session",
+      "category": "non_functional",
+      "sub_category": "security",
+      "description": "All passwords must be hashed and salted with no plaintext storage. Session tokens must be encrypted and expire after 30 minutes of inactivity.",
+      "source": "section_7_governance"
+    },
+    {
+      "req_id": "REQ-020",
+      "name": "Security — Access Control and Malware",
+      "category": "non_functional",
+      "sub_category": "security",
+      "description": "Role-based access must prevent candidates and recruiters from accessing each other's restricted features. Resume files must be scanned for malware before storage.",
+      "source": "section_7_governance"
+    },
+    {
+      "req_id": "REQ-021",
+      "name": "Compliance — GDPR and Audit Logging",
+      "category": "non_functional",
+      "sub_category": "compliance",
+      "description": "User data and resumes must be stored in compliance with GDPR and local privacy regulations. All access and actions must be logged for audit and retained for 90 days.",
+      "source": "section_7_governance"
+    },
+    {
+      "req_id": "REQ-022",
+      "name": "Guardrails — File Validation",
+      "category": "non_functional",
+      "sub_category": "guardrails",
+      "description": "Maximum resume file size of 5 MB must be strictly enforced. Only supported formats (PDF, DOC, DOCX) are accepted. No sensitive PII must be exposed in logs or error messages.",
+      "source": "section_7_governance"
+    },
+    {
+      "req_id": "REQ-023",
+      "name": "Cost Management — Storage and Rate Limiting",
+      "category": "non_functional",
+      "sub_category": "cost_management",
+      "description": "Resume storage must be optimised; files older than 1 year must be archived. API calls for dashboard and downloads must be rate-limited to prevent abuse.",
+      "source": "section_7_governance"
+    },
+    {
+      "req_id": "REQ-024",
+      "name": "Reliability — Monitoring and Backups",
+      "category": "non_functional",
+      "sub_category": "reliability",
+      "description": "System must be monitored for uptime with automated alerts for failures. Daily backups of user and application data are required.",
+      "source": "section_7_governance"
+    },
+    {
+      "req_id": "REQ-025",
+      "name": "Usability — Error Messages and Accessibility",
+      "category": "non_functional",
+      "sub_category": "usability",
+      "description": "All error messages must be user-friendly and actionable. The portal must support accessibility standards (WCAG 2.1 AA).",
+      "source": "section_7_governance"
+    },
+    {
+      "req_id": "REQ-026",
+      "name": "Supported Environment",
+      "category": "non_functional",
+      "sub_category": "environment",
+      "description": "Web-based portal only. Must be compatible with Chrome 90+, Firefox 88+, Safari 14+, and Edge 90+. English language interface in the initial phase.",
+      "source": "section_7_governance"
+    }
+  ],
+
+  "agent_network": [
+    { "from": "User",  "to": "A1", "label": "Register" },
+    { "from": "A1",   "to": "A2", "label": "Credentials created" },
+    { "from": "A2",   "to": "A3", "label": "Candidate authenticated" },
+    { "from": "A3",   "to": "A4", "label": "Resume uploaded" },
+    { "from": "A4",   "to": "A5", "label": "Job selected" },
+    { "from": "A5",   "to": "A5", "label": "Application submitted → Confirmation" },
+    { "from": "A2",   "to": "A6", "label": "Recruiter authenticated" },
+    { "from": "A6",   "to": "A7", "label": "Download requested" }
+  ],
+
+  "metadata": {
+    "source_document": "Agent_Requirement_Specification.docx",
+    "project": "AI Job Portal",
+    "total_requirements": 26,
+    "categories": {
+      "business_goal": 2,
+      "functional": 3,
+      "agent": 7,
+      "failure_handling": 5,
+      "non_functional": 9
+    },
+    "version": "1.0.0",
+    "created": "2026-05-13"
+  }
+}

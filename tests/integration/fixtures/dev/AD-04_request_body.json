@@ -1,0 +1,12 @@
+{
+  "business_case": "Customers need self-service authentication including login, logout, password reset, and audit logging for compliance with SOC2.",
+  "project_context": {
+    "squad": "auth",
+    "domain": "identity",
+    "project_name": "customer-portal-auth"
+  },
+  "scope_boundaries": {
+    "in_scope": ["login", "logout", "password_reset", "audit_logging"],
+    "out_of_scope": ["sso", "mfa"]
+  }
+}

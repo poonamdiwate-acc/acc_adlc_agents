@@ -1,0 +1,194 @@
+{
+  "tech_stack": {
+    "id": "ADLC-TECH",
+    "version": "2.0.0",
+    "description": "Runtime technology preferences for the ADLC pipeline. Standalone agents only — orchestration owned by GenWiz. Read by config_loader.py at startup. Not read by any LLM agent."
+  },
+  "runtime": {
+    "python_version": "3.11",
+    "framework": "fastapi",
+    "server": "uvicorn",
+    "execution_mode": "async",
+    "orchestration": "none",
+    "_orchestration_note": "GenWiz owns all orchestration. ADLC exposes standalone stateless agents only."
+  },
+  "llm": {
+    "provider": "google-vertex",
+    "sdk": "google-genai",
+    "sdk_version": ">=0.8.0",
+    "default_model": "gemini-2.5-flash",
+    "fallback_model": "gemini-2.5-flash",
+    "response_format": "json",
+    "stream": false
+  },
+  "skill_loader": {
+    "skill_dir": "skills/",
+    "system_prompt_marker": "## System prompt",
+    "code_fence": "```",
+    "version_marker": "SKILL.md · v"
+  },
+  "config_loader": {
+    "config_dir": "configs/",
+    "files": {
+      "ADLC-TECH": "ADLC_Tech_Stack_Config.json",
+      "AD-04": "AD-04_Gap_Detection_Config.json"
+    },
+    "_note": "Add new agent config files here as they are created. PL-00 removed — GenWiz owns orchestration."
+  },
+  "logging": {
+    "level": "INFO",
+    "log_agent_inputs": false,
+    "log_agent_outputs": false,
+    "log_llm_calls": true,
+    "log_routing": true,
+    "log_state_changes": false,
+    "_security_note": "Never log raw_prompt or business_case contents in prod — may contain sensitive data"
+  },
+  "api": {
+    "framework": "fastapi",
+    "health_check": true,
+    "run_id_endpoint": true,
+    "input_validation": "pydantic_v2",
+    "auth": "bearer_token",
+    "auth_header": "Authorization",
+    "run_id_header": "X-Run-ID"
+  },
+  "environment": {
+    "GOOGLE_CLOUD_PROJECT": {
+      "required": true,
+      "description": "GCP project ID hosting the Vertex AI Gemini endpoint"
+    },
+    "GOOGLE_CLOUD_LOCATION": {
+      "required": true,
+      "description": "GCP region for the Vertex AI endpoint (e.g. us-central1)"
+    },
+    "GOOGLE_APPLICATION_CREDENTIALS": {
+      "required": true,
+      "description": "Absolute path to the service-account JSON used to authenticate to Vertex"
+    },
+    "GOOGLE_GENAI_USE_VERTEXAI": {
+      "required": false,
+      "description": "Set to 'true' to route google-genai calls through Vertex (already forced by code via vertexai=True)",
+      "default": "true"
+    },
+    "ENV": {
+      "required": true,
+      "description": "dev | prod",
+      "default": "dev"
+    },
+    "GIT_TOKEN": {
+      "required": true,
+      "description": "Git PAT for ADLC audit repo commits"
+    },
+    "ADLC_AUDIT_REPO_URL": {
+      "required": true,
+      "description": "Git repo URL for audit trail commits"
+    },
+    "ADLC_API_KEY": {
+      "required": true,
+      "description": "Bearer token for GenWiz authentication"
+    },
+    "LOG_LEVEL": {
+      "required": false,
+      "description": "INFO | DEBUG | WARNING | ERROR",
+      "default": "INFO"
+    },
+    "CONFIG_DIR": {
+      "required": false,
+      "description": "Override default configs/ directory path"
+    },
+    "SKILL_DIR": {
+      "required": false,
+      "description": "Override default skills/ directory path"
+    }
+  },
+  "testing": {
+    "framework": "pytest",
+    "async_plugin": "pytest-asyncio",
+    "mock_llm": true,
+    "mock_provider": "unittest.mock",
+    "test_dir": "tests/",
+    "run_real_llm_tests": false,
+    "_note": "Set run_real_llm_tests: true locally to run integration tests against real Vertex Gemini API"
+  },
+  "metadata": {
+    "version": "2.0.0",
+    "last_updated": "2026-05-13",
+    "status": "ready",
+    "_changes": "v2.0.0 — removed LangGraph, checkpointer, state, orchestration. GenWiz owns orchestration. ADLC is standalone agent service."
+  },
+  "git_writer": {
+    "library": "GitPython",
+    "auth_method": "ENV:GIT_TOKEN",
+    "mode": "async",
+    "on_failure": "log_and_continue",
+    "_note": "Does not block agent HTTP response"
+  },
+  "git_reader": {
+    "library": "GitPython",
+    "local_audit_dir": "tests/integration/fixtures",
+    "cache_dir": ".git_cache",
+    "_note": "When an agent has git_reader.enabled: false, files are read from {local_audit_dir}/{git_path} on local disk. When enabled: true, GitPython clones/fetches the audit repo into {cache_dir} and reads from there."
+  },
+  "mcp_server": {
+    "enabled": true,
+    "library": "mcp",
+    "sdk_version": ">=1.0.0",
+    "resources": ["manifest"],
+    "tools": ["agents"],
+    "iteration": 1
+  },
+  "observability": {
+    "enabled": false,
+    "iteration": 2,
+    "logging": "structured",
+    "tracing": "opentelemetry",
+    "metrics": "prometheus",
+    "_note": "Deferred to Iteration 2"
+  },
+  "llm_defaults": {
+    "_note": "System-wide LLM defaults inherited by all agents. Agent llm_config_override only needs to set max_tokens and timeout_seconds.",
+    "on_gap": "flag_and_continue",
+    "confidence_threshold": 0.75,
+    "retry_attempts": 2,
+    "on_low_confidence": "flag_and_continue",
+    "on_timeout": "retry_then_fallback"
+  },
+  "folder_structure": {
+    "core": [
+      "exceptions.py",
+      "llm_client.py",
+      "skill_loader.py",
+      "config_loader.py",
+      "agent_registry.py"
+    ],
+    "agents": [
+      "ad04_gap_detection/"
+    ],
+    "agent_subfiles": [
+      "agent.py",
+      "behaviour.py",
+      "input_builder.py",
+      "output_parser.py"
+    ],
+    "mcp": [
+      "server.py",
+      "resources/manifest.py",
+      "tools/ad04_tool.py"
+    ],
+    "api": [
+      "server.py",
+      "middleware/auth.py",
+      "routers/health.py",
+      "routers/agents.py"
+    ],
+    "gitops": [
+      "git_reader.py",
+      "git_writer.py"
+    ],
+    "_gitops_note": "Package named 'gitops' (not 'git') to avoid shadowing the GitPython 'git' package on sys.path.",
+    "configs": "all agent config JSON files",
+    "skills": "all agent SKILL.md files",
+    "tests": "pytest test files"
+  }
+}

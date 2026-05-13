@@ -1,0 +1,340 @@
+{
+  "run_id": "{run_id}",
+  "agent_id": "AD-01",
+  "phase": "plan",
+  "structured_requirements": [
+
+    {
+      "req_id": "REQ-001",
+      "name": "AI Job Portal Platform Vision",
+      "category": "business_goal",
+      "priority": "high",
+      "description": "Create a user-friendly job portal specialising in AI and machine learning positions, enabling candidates to easily apply for positions and recruiters to efficiently manage applications via a centralised hub with role-based access.",
+      "source": "section_1_executive_summary"
+    },
+    {
+      "req_id": "REQ-002",
+      "name": "Efficiency — Reduce Manual Effort",
+      "category": "business_objective",
+      "priority": "high",
+      "description": "Reduce manual effort in application and review processes by 60% through automation and streamlined workflows.",
+      "metric": "Process effort reduction",
+      "target": "60%",
+      "source": "section_2_business_objectives"
+    },
+    {
+      "req_id": "REQ-003",
+      "name": "User Adoption — Candidate Registrations",
+      "category": "business_objective",
+      "priority": "high",
+      "description": "Achieve 500+ registered candidates in Q1 to validate platform adoption.",
+      "metric": "Registered candidates",
+      "target": "500+",
+      "source": "section_2_business_objectives"
+    },
+    {
+      "req_id": "REQ-004",
+      "name": "Recruiter Satisfaction",
+      "category": "business_objective",
+      "priority": "medium",
+      "description": "Achieve an 85%+ recruiter satisfaction rating with the platform's application management features.",
+      "metric": "Satisfaction rating",
+      "target": "85%+",
+      "source": "section_2_business_objectives"
+    },
+    {
+      "req_id": "REQ-005",
+      "name": "Application Completion Rate",
+      "category": "business_objective",
+      "priority": "medium",
+      "description": "Achieve an 80%+ application completion rate, ensuring candidates who start an application successfully submit it.",
+      "metric": "Completed applications",
+      "target": "80%+",
+      "source": "section_2_business_objectives"
+    },
+    {
+      "req_id": "REQ-006",
+      "name": "Time-to-Review Reduction",
+      "category": "business_objective",
+      "priority": "medium",
+      "description": "Reduce average recruiter review time by 40% through dashboard tooling and resume management features.",
+      "metric": "Average review time",
+      "target": "↓ 40%",
+      "source": "section_2_business_objectives"
+    },
+
+    {
+      "req_id": "REQ-007",
+      "name": "User Registration",
+      "category": "functional",
+      "priority": "high",
+      "fr_id": "FR-1.1",
+      "description": "The system shall allow users to register as either a Candidate or Recruiter. Users can select their role during registration. Password must meet security requirements: minimum 8 characters, uppercase, lowercase, number, and special character. Email verification is not required.",
+      "acceptance_criteria": [
+        "Users can select role (Candidate or Recruiter) during registration",
+        "Email verification not required",
+        "Password min 8 chars, must include uppercase, lowercase, number, special character"
+      ],
+      "user_stories": ["US-1"],
+      "source": "section_5_1_authentication"
+    },
+    {
+      "req_id": "REQ-008",
+      "name": "User Login",
+      "category": "functional",
+      "priority": "high",
+      "fr_id": "FR-1.2",
+      "description": "The system shall provide secure login functionality for both Candidates and Recruiters using email and password credentials with session management.",
+      "acceptance_criteria": [
+        "Users can log in with email and password",
+        "Secure authentication with session management",
+        "Role verification enforced on login"
+      ],
+      "user_stories": ["US-2", "US-7"],
+      "source": "section_5_1_authentication"
+    },
+    {
+      "req_id": "REQ-009",
+      "name": "Resume Upload",
+      "category": "functional",
+      "priority": "high",
+      "fr_id": "FR-2.1",
+      "description": "Candidates shall be able to upload their resume. Supported formats are PDF, DOC, and DOCX with a maximum file size of 5 MB. The system must display an upload progress indicator, success/error messages, and allow preview of the uploaded resume.",
+      "acceptance_criteria": [
+        "Supported formats: PDF, DOC, DOCX",
+        "Maximum file size: 5 MB",
+        "Upload progress indicator displayed",
+        "Success and error messages shown",
+        "Preview of uploaded resume available"
+      ],
+      "user_stories": ["US-3"],
+      "source": "section_5_2_candidate_features"
+    },
+    {
+      "req_id": "REQ-010",
+      "name": "Job Position Selection",
+      "category": "functional",
+      "priority": "high",
+      "fr_id": "FR-2.2",
+      "description": "Candidates shall select a job position from a dropdown menu listing all active hardcoded AI skill roles. Single selection is allowed per application. Job descriptions must be visible on hover or expand. Field is mandatory.",
+      "acceptance_criteria": [
+        "Dropdown lists all active hardcoded AI roles",
+        "Single selection per application",
+        "Job description visible on hover or expand",
+        "Mandatory field validation enforced"
+      ],
+      "user_stories": ["US-4"],
+      "source": "section_5_2_candidate_features"
+    },
+    {
+      "req_id": "REQ-011",
+      "name": "Application Submission",
+      "category": "functional",
+      "priority": "high",
+      "fr_id": "FR-2.3",
+      "description": "Candidates shall submit their application consisting of their uploaded resume and selected job position. All mandatory fields must be completed. A confirmation message and unique application reference number must be generated upon successful submission.",
+      "acceptance_criteria": [
+        "All mandatory fields must be filled before submission",
+        "Confirmation message displayed on successful submission",
+        "Unique application reference number generated"
+      ],
+      "user_stories": ["US-5"],
+      "source": "section_5_2_candidate_features"
+    },
+    {
+      "req_id": "REQ-012",
+      "name": "Recruiter Resume Dashboard",
+      "category": "functional",
+      "priority": "high",
+      "fr_id": "FR-3.1",
+      "description": "Recruiters shall view all submitted resumes and application details in a dashboard. The dashboard must display candidate name, applied position, submission date, and status. Pagination at 20 records per page and sort by date, position, and candidate name are required. A download resume button must be present per record.",
+      "acceptance_criteria": [
+        "List view of all submitted applications",
+        "Display: candidate name, applied position, submission date, status",
+        "Pagination at 20 records per page",
+        "Sort by date, position, and candidate name",
+        "Download resume functionality per record"
+      ],
+      "user_stories": ["US-8", "US-11"],
+      "source": "section_5_3_recruiter_features"
+    },
+
+    {
+      "req_id": "REQ-013",
+      "name": "AI Job Positions — Dropdown Options",
+      "category": "data",
+      "priority": "high",
+      "description": "The job position dropdown must include the following 15 hardcoded AI roles: Machine Learning Engineer, AI Research Scientist, Data Scientist, Deep Learning Engineer, NLP Engineer, Computer Vision Engineer, AI/ML Solutions Architect, MLOps Engineer, Prompt Engineer, AI Product Manager, Robotics Engineer, AI Ethics Specialist, Conversational AI Developer, AI Data Engineer, Generative AI Specialist.",
+      "values": [
+        "Machine Learning Engineer",
+        "AI Research Scientist",
+        "Data Scientist",
+        "Deep Learning Engineer",
+        "NLP Engineer (Natural Language Processing)",
+        "Computer Vision Engineer",
+        "AI/ML Solutions Architect",
+        "MLOps Engineer",
+        "Prompt Engineer",
+        "AI Product Manager",
+        "Robotics Engineer",
+        "AI Ethics Specialist",
+        "Conversational AI Developer",
+        "AI Data Engineer",
+        "Generative AI Specialist"
+      ],
+      "source": "section_6_job_skills"
+    },
+
+    {
+      "req_id": "REQ-014",
+      "name": "User Data Model",
+      "category": "data",
+      "priority": "high",
+      "description": "User entity must store: User ID (PK), Email (Unique), Password (Encrypted), Role, First Name, Last Name, Phone Number, Created Date, Last Login, Account Status.",
+      "fields": ["user_id", "email", "password", "role", "first_name", "last_name", "phone_number", "created_date", "last_login", "account_status"],
+      "source": "section_10_data_requirements"
+    },
+    {
+      "req_id": "REQ-015",
+      "name": "Candidate Profile Data Model",
+      "category": "data",
+      "priority": "high",
+      "description": "Candidate profile entity must store: Profile ID (PK), User ID (FK), Skills (Array), Experience Level, Preferred Location, LinkedIn URL, Resume File Path, Updated Date.",
+      "fields": ["profile_id", "user_id", "skills", "experience_level", "preferred_location", "linkedin_url", "resume_file_path", "updated_date"],
+      "source": "section_10_data_requirements"
+    },
+    {
+      "req_id": "REQ-016",
+      "name": "Job Position Data Model",
+      "category": "data",
+      "priority": "high",
+      "description": "Job Position entity must store: Job ID (PK), Job Title, Description, Required Skills, Experience Required, Location, Employment Type, Status, Created By, Created Date.",
+      "fields": ["job_id", "job_title", "description", "required_skills", "experience_required", "location", "employment_type", "status", "created_by", "created_date"],
+      "source": "section_10_data_requirements"
+    },
+    {
+      "req_id": "REQ-017",
+      "name": "Application Data Model",
+      "category": "data",
+      "priority": "high",
+      "description": "Application entity must store: Application ID (PK), Candidate ID (FK), Job ID (FK), Resume File Name, Resume File Path, Submission Date, Application Status, Status Updated Date, Updated By (FK).",
+      "fields": ["application_id", "candidate_id", "job_id", "resume_file_name", "resume_file_path", "submission_date", "application_status", "status_updated_date", "updated_by"],
+      "source": "section_10_data_requirements"
+    },
+
+    {
+      "req_id": "REQ-018",
+      "name": "Candidate End-to-End Workflow",
+      "category": "workflow",
+      "priority": "high",
+      "description": "Candidate workflow: (1) Register or Login, (2) Fill profile information, (3) Select AI skills from checklist, (4) Browse available job positions, (5) Select desired job from dropdown, (6) Upload resume (PDF/DOC), (7) Submit application, (8) System validates all fields, (9) System stores resume and application data.",
+      "steps": [
+        "Register / Login",
+        "Fill profile information",
+        "Select AI skills from checklist",
+        "Browse available job positions",
+        "Select desired job from dropdown",
+        "Upload resume (PDF/DOC)",
+        "Submit application",
+        "System validates all fields",
+        "System stores resume and application data"
+      ],
+      "source": "section_9_system_workflow"
+    },
+    {
+      "req_id": "REQ-019",
+      "name": "Recruiter End-to-End Workflow",
+      "category": "workflow",
+      "priority": "high",
+      "description": "Recruiter workflow: (1) Login, (2) Land on dashboard showing all applications, (3) Apply filters by position, date, and skills, (4) Review candidate information, (5) Download resume for detailed review, (6) Continue reviewing next application.",
+      "steps": [
+        "Login",
+        "Land on dashboard (all applications)",
+        "Apply filters (position, date, skills)",
+        "Review candidate information",
+        "Download resume for detailed review",
+        "Continue reviewing next application"
+      ],
+      "source": "section_9_system_workflow"
+    },
+
+    {
+      "req_id": "REQ-020",
+      "name": "Technical Constraint — Web Only",
+      "category": "constraint",
+      "priority": "high",
+      "description": "The system is web-based only. No mobile application in Phase 1. Must be compatible with Chrome 90+, Firefox 88+, Safari 14+, and Edge 90+. Internet connection required. English language only in Phase 1.",
+      "source": "section_11_technical_constraints"
+    },
+    {
+      "req_id": "REQ-021",
+      "name": "Technical Constraint — File Restrictions",
+      "category": "constraint",
+      "priority": "high",
+      "description": "Resume file size strictly limited to 5 MB. Supported file formats are PDF, DOC, and DOCX only. No other formats accepted.",
+      "source": "section_11_technical_constraints"
+    },
+
+    {
+      "req_id": "REQ-022",
+      "name": "Out of Scope — Future Phases",
+      "category": "out_of_scope",
+      "priority": "low",
+      "description": "The following features are explicitly out of scope for Phase 1: advanced AI-based resume screening, automated candidate-job matching algorithms, interview scheduling, candidate-recruiter messaging, payment processing for premium features, mobile application, social media integration, and background verification services.",
+      "items": [
+        "Advanced AI-based resume screening",
+        "Automated candidate-job matching algorithms",
+        "Interview scheduling functionality",
+        "Communication/messaging between candidates and recruiters",
+        "Payment processing for premium features",
+        "Mobile application",
+        "Social media integration",
+        "Background verification services"
+      ],
+      "source": "section_3_2_out_of_scope"
+    },
+
+    {
+      "req_id": "REQ-023",
+      "name": "Assumption — User Load",
+      "category": "assumption",
+      "priority": "medium",
+      "description": "Initial user load will be moderate, under 5,000 users. Users have valid email addresses, internet access, and modern web browsers. Candidates have resumes prepared in supported formats. Job positions will be pre-populated by system administrators.",
+      "source": "section_12_assumptions"
+    }
+  ],
+
+  "user_stories": [
+    { "us_id": "US-1",  "role": "candidate",  "action": "register for an account",            "goal": "apply for jobs",                              "ac": "Registration form with role selection and password validation" },
+    { "us_id": "US-2",  "role": "candidate",  "action": "login securely",                      "goal": "access my profile",                           "ac": "Secure authentication with session management" },
+    { "us_id": "US-3",  "role": "candidate",  "action": "upload my resume",                    "goal": "recruiters can review my qualifications",     "ac": "Upload PDF/DOC/DOCX files up to 5 MB with preview" },
+    { "us_id": "US-4",  "role": "candidate",  "action": "select a specific job position",      "goal": "apply for relevant opportunities",            "ac": "Dropdown menu with AI job positions, mandatory selection" },
+    { "us_id": "US-5",  "role": "candidate",  "action": "submit my application",               "goal": "it reaches the recruiter",                    "ac": "Successful submission with confirmation and reference number" },
+    { "us_id": "US-7",  "role": "recruiter",  "action": "login securely",                      "goal": "access candidate resumes",                    "ac": "Secure authentication with role verification" },
+    { "us_id": "US-8",  "role": "recruiter",  "action": "view all submitted resumes",          "goal": "review candidates",                           "ac": "Dashboard with list of all applications, sort and pagination" },
+    { "us_id": "US-11", "role": "recruiter",  "action": "download resumes",                    "goal": "review them offline",                         "ac": "Download button for each resume record" }
+  ],
+
+  "metadata": {
+    "source_document": "AI_Job_Portal.docx",
+    "document_version": "1.0",
+    "document_date": "2026-05-05",
+    "project": "AI Job Portal Application",
+    "prepared_by": "Business Analyst Team",
+    "status": "draft",
+    "total_requirements": 23,
+    "categories": {
+      "business_goal": 1,
+      "business_objective": 5,
+      "functional": 6,
+      "data": 5,
+      "workflow": 2,
+      "constraint": 2,
+      "out_of_scope": 1,
+      "assumption": 1
+    },
+    "total_user_stories": 8,
+    "version": "1.0.0",
+    "created": "2026-05-13"
+  }
+}

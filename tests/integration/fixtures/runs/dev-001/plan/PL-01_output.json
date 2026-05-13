@@ -1,0 +1,63 @@
+{
+  "structured_requirements": [
+    {
+      "req_id": "REQ-001",
+      "title": "User login",
+      "description": "Customers must be able to log in with email and password.",
+      "type": "functional",
+      "priority": "high",
+      "acceptance_criterion": "Valid credentials return a session token within 500ms p95.",
+      "source_ref": "business_case",
+      "confidence": "high",
+      "out_of_scope_flag": false,
+      "ambiguity_flag": false,
+      "gaps_detected": false
+    },
+    {
+      "req_id": "REQ-002",
+      "title": "Fast response",
+      "description": "The system must be fast.",
+      "type": "non_functional",
+      "subtype": "performance",
+      "priority": "high",
+      "acceptance_criterion": "The system feels responsive.",
+      "source_ref": "raw_prompt",
+      "confidence": "low",
+      "out_of_scope_flag": false,
+      "ambiguity_flag": true,
+      "gaps_detected": true
+    },
+    {
+      "req_id": "REQ-003",
+      "title": "Reset password",
+      "description": "Users can reset forgotten passwords via email.",
+      "type": "functional",
+      "priority": "medium",
+      "acceptance_criterion": "Reset email sent within 1 minute of request.",
+      "source_ref": "business_case",
+      "confidence": "high",
+      "out_of_scope_flag": false,
+      "ambiguity_flag": false,
+      "gaps_detected": false
+    },
+    {
+      "req_id": "REQ-004",
+      "title": "User logout",
+      "description": "User can log out.",
+      "type": "functional",
+      "priority": "medium",
+      "acceptance_criterion": "Session is invalidated.",
+      "source_ref": "business_case",
+      "confidence": "medium",
+      "out_of_scope_flag": false,
+      "ambiguity_flag": false,
+      "gaps_detected": false
+    }
+  ],
+  "confidence_flag": {
+    "overall_confidence": "medium",
+    "low_confidence_items": ["REQ-002"],
+    "ambiguous_items": ["REQ-002"],
+    "out_of_scope_items": []
+  }
+}

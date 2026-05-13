@@ -1,0 +1,42 @@
+{
+  "structured_requirements": [
+    {
+      "req_id": "REQ-001",
+      "title": "User login",
+      "description": "Customers must be able to log in with email and password.",
+      "type": "functional",
+      "priority": "high",
+      "acceptance_criterion": "Valid credentials return a session token within 500ms.",
+      "source_ref": "business_case"
+    },
+    {
+      "req_id": "REQ-002",
+      "title": "Fast response",
+      "description": "The system must be fast.",
+      "type": "non_functional",
+      "subtype": "performance",
+      "priority": "high",
+      "acceptance_criterion": "The system feels responsive.",
+      "source_ref": "raw_prompt"
+    },
+    {
+      "req_id": "REQ-003",
+      "title": "Reset password",
+      "description": "Users can reset forgotten passwords.",
+      "type": "functional",
+      "priority": "medium",
+      "acceptance_criterion": "Reset email sent within 1 minute.",
+      "source_ref": "business_case"
+    }
+  ],
+  "business_case": "Customers need self-service authentication including login, logout, password reset, and audit logging for compliance with SOC2.",
+  "project_context": {
+    "squad": "auth",
+    "domain": "identity",
+    "project_name": "customer-portal-auth"
+  },
+  "scope_boundaries": {
+    "in_scope": ["login", "logout", "password_reset", "audit_logging"],
+    "out_of_scope": ["sso", "mfa"]
+  }
+}

@@ -1,0 +1,177 @@
+{
+  "agent": {
+    "id": "AD-04",
+    "name": "Gap Detection Agent",
+    "version": "1.0.0",
+    "description": "Analyses structured requirements to identify gaps, ambiguities, missing information, and implied but unstated requirements. Returns a gap report with severity, category, and recommended resolution per item.",
+    "phase": "plan",
+    "standalone": true,
+    "endpoint": "/agents/gap-detection",
+    "mcp_tool_name": "run_gap_detection",
+    "skill_file": "AD-04_Gap_Detection_SKILL.md",
+    "step_number": 4,
+    "previous_step": {
+      "step_number": 3,
+      "agent_id": "PL-01",
+      "agent_name": "Requirement Specification"
+    }
+  },
+  "llm_config_override": {
+    "max_tokens": 8192,
+    "timeout_seconds": 60
+  },
+  "behaviour": {
+    "on_empty_requirements": "stop_and_report",
+    "on_no_gaps_found": "return_clean_report",
+    "on_low_confidence": "flag_and_continue",
+    "min_requirements": 1,
+    "gap_categories": [
+      "missing_acceptance_criteria",
+      "ambiguous_language",
+      "implied_but_unstated",
+      "conflicting_requirements",
+      "out_of_scope_not_flagged",
+      "non_measurable_nfr",
+      "missing_actor",
+      "missing_business_value"
+    ],
+    "severity_levels": [
+      "critical",
+      "high",
+      "medium",
+      "low"
+    ],
+    "blocking_severities": [
+      "critical",
+      "high"
+    ],
+    "_blocking_note": "critical and high gaps are returned to calling agent or GenWiz as blocking — should be resolved before backlog generation"
+  },
+  "manifest": {
+    "takes_from": {
+      "git": [
+        "structured_requirements"
+      ],
+      "phase_input": [
+        "business_case",
+        "project_context",
+        "scope_boundaries"
+      ]
+    },
+    "returns": [
+      "gap_report",
+      "gap_summary"
+    ],
+    "run_id_required": true,
+    "run_id_source": "X-Run-ID header"
+  },
+  "inputs": {
+    "structured_requirements": {
+      "required": true,
+      "type": "array",
+      "git_path": "runs/{run_id}/plan/PL-01_output.json",
+      "json_field": "structured_requirements",
+      "min_items": 1,
+      "on_fail": "stop_and_report"
+    },
+    "business_case": {
+      "required": true,
+      "type": "string",
+      "on_fail": "stop_and_report"
+    },
+    "project_context": {
+      "required": true,
+      "type": "object",
+      "on_fail": "stop_and_report"
+    },
+    "scope_boundaries": {
+      "required": false,
+      "type": "object",
+      "on_missing": "proceed_without"
+    }
+  },
+  "outputs": {
+    "gap_report": {
+      "type": "array",
+      "description": "One item per gap identified. Each item has req_id_ref, gap_type, severity, description, and recommendation.",
+      "item_schema": {
+        "gap_id": "GAP-### sequential",
+        "req_id_ref": "REQ-### from PL-01 or null if implied requirement with no REQ",
+        "gap_type": "one of gap_categories",
+        "severity": "critical | high | medium | low",
+        "description": "Plain English description of the gap",
+        "recommendation": "Specific action to resolve the gap",
+        "auto_resolvable": false
+      }
+    },
+    "gap_summary": {
+      "type": "object",
+      "description": "Aggregated summary of all gaps found.",
+      "schema": {
+        "total_requirements_analysed": "integer",
+        "total_gaps_found": "integer",
+        "blocking_gaps": "integer",
+        "gaps_by_severity": {
+          "critical": "integer",
+          "high": "integer",
+          "medium": "integer",
+          "low": "integer"
+        },
+        "gaps_by_category": "object — count per gap_category",
+        "overall_quality": "clean | needs_attention | blocked",
+        "recommendation": "proceed | resolve_blocking_gaps_first | significant_rework_needed"
+      }
+    }
+  },
+  "skills": {
+    "gap_analysis": {
+      "enabled": true,
+      "description": "Cross-references structured requirements against the business case to identify missing coverage, ambiguous language, and implied but unstated requirements."
+    },
+    "ambiguity_detection": {
+      "enabled": true,
+      "description": "Scans each requirement for vague language, unmeasurable criteria, missing actors, and missing business value statements."
+    },
+    "conflict_detection": {
+      "enabled": true,
+      "description": "Checks for requirements that contradict each other or that conflict with scope_boundaries."
+    },
+    "auto_resolution": {
+      "enabled": false,
+      "_note": "Deferred. Would auto-generate missing acceptance criteria for low-severity gaps."
+    }
+  },
+  "tools": {
+    "gap_classifier": {
+      "enabled": true,
+      "description": "Classifies each identified gap by type and severity using gap_categories and severity_levels from behaviour."
+    }
+  },
+  "metadata": {
+    "id": "AD-04",
+    "version": "1.0.0",
+    "status": "ready_for_iteration_1",
+    "last_updated": "2026-05-13",
+    "_renamed_from": "PL-GD-01 — renamed per ADLC_Tech_Stack_Config v2.0.0"
+  },
+  "dev": {
+    "enabled": true,
+    "phase_input_fixture": "tests/integration/fixtures/dev/AD-04_AI_Job_Portal_business_spec.json",
+    "git_input_fixtures": {
+    "structured_requirements": "tests/integration/fixtures/dev/AD-04_AI_Job_Portal_structured_requirements.json"
+  },
+    "_note": "Used only when ENV=dev AND enabled=true. phase_input_fixture replaces an empty HTTP body. git_input_fixtures override the git/local fetch for the listed fields. In prod (ENV=prod) this whole block is ignored."
+  },
+  "git_reader": {
+    "enabled": false,
+    "repo_url": "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method": "ENV:GIT_TOKEN",
+    "branch": "main",
+    "run_id_source": "header",
+    "run_id_header": "X-Run-ID",
+    "read_path_pattern": "runs/{run_id}/{phase}/{agent_id}_output.json",
+    "phase": "plan",
+    "_enabled_note": "false → read from local files under tech_stack.git_reader.local_audit_dir. true → read from the real audit repo via GitPython. Toggle per environment.",
+    "_note": "run_id is passed by GenWiz as X-Run-ID header on every agent call. Agent uses it to resolve the path and read previous step output."
+  }
+}
