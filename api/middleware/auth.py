@@ -21,6 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 _API_KEY_ENV = "ADLC_API_KEY"
 _AUTH_HEADER = "Authorization"
 _BEARER_PREFIX = "Bearer "
+_PUBLIC_SUFFIX = "/.well-known/agent-card.json"
 
 
 class BearerTokenMiddleware(BaseHTTPMiddleware):
@@ -31,7 +32,8 @@ class BearerTokenMiddleware(BaseHTTPMiddleware):
         self._exempt = tuple(exempt_paths)
 
     async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith(self._exempt):
+        path = request.url.path
+        if path.startswith(self._exempt) or path.endswith(_PUBLIC_SUFFIX):
             return await call_next(request)
 
         expected = os.environ.get(_API_KEY_ENV)
