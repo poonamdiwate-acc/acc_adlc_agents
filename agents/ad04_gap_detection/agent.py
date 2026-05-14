@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-from pathlib import Path
 from typing import Any, Dict
 
 from agents.ad04_gap_detection import behaviour, input_builder, output_parser
@@ -113,37 +111,30 @@ async def _resolve_git_inputs(
 ) -> Dict[str, Any]:
     """Fetch every input that declares a ``git_path`` and merge into payload.
 
-    Payload values do **not** override git-sourced inputs — the config is
-    authoritative. If a field is declared as git-sourced, that's where we
-    read it from.
-
-    In dev (``ENV=dev`` and the agent's ``dev.enabled`` is true), any field
-    listed under ``dev.git_input_fixtures`` is loaded from the declared
-    local path instead of going through the git_reader.
+    If a field is already present in the payload (e.g. read from the shared
+    folder), the git read is skipped — shared folder takes precedence.
     """
     resolved = dict(payload)
-    dev_overrides = _dev_git_fixture_overrides()
     for field_name, spec in _inputs_cfg.items():
         if not isinstance(spec, dict):
             continue
         git_path_template = spec.get("git_path")
         if not git_path_template:
             continue
+        # Skip if already provided (e.g. from shared folder)
+        if resolved.get(field_name):
+            logger.info(
+                "AD-04 skipping git read: field=%s (already in payload)",
+                field_name,
+            )
+            continue
         git_path = git_path_template.format(run_id=run_id)
         json_field = spec.get("json_field", field_name)
-        if field_name in dev_overrides:
-            fixture_path = dev_overrides[field_name]
-            logger.info(
-                "AD-04 reading dev fixture (override): field=%s path=%s",
-                field_name, fixture_path,
-            )
-            content = _read_dev_fixture(fixture_path, field_name)
-        else:
-            logger.info(
-                "AD-04 reading git input: field=%s path=%s reader=%s",
-                field_name, git_path, type(_git_reader).__name__,
-            )
-            content = await _git_reader.read_json(git_path)
+        logger.info(
+            "AD-04 reading git input: field=%s path=%s reader=%s",
+            field_name, git_path, type(_git_reader).__name__,
+        )
+        content = await _git_reader.read_json(git_path)
         if not isinstance(content, dict):
             from core.exceptions import GitReadError
             raise GitReadError(
@@ -153,45 +144,6 @@ async def _resolve_git_inputs(
             )
         resolved[field_name] = content.get(json_field)
     return resolved
-
-
-def _dev_git_fixture_overrides() -> Dict[str, Path]:
-    """Return ``{field_name: absolute fixture path}`` for the current run.
-
-    Returns an empty dict outside dev mode or when the agent has no
-    ``dev.git_input_fixtures`` declared.
-    """
-    if os.environ.get("ENV", "").lower() != "dev":
-        return {}
-    dev_block = _config.dev_config(AGENT_ID)
-    if not dev_block.get("enabled"):
-        return {}
-    raw = dev_block.get("git_input_fixtures") or {}
-    if not isinstance(raw, dict):
-        return {}
-    project_root = _config.project_root()
-    overrides: Dict[str, Path] = {}
-    for field, rel_path in raw.items():
-        if isinstance(rel_path, str) and rel_path.strip():
-            overrides[field] = (project_root / rel_path).resolve()
-    return overrides
-
-
-def _read_dev_fixture(path: Path, field_name: str) -> Dict[str, Any]:
-    """Read and JSON-parse a dev git_input_fixture file."""
-    from core.exceptions import GitReadError
-    if not path.is_file():
-        raise GitReadError(
-            f"Dev fixture not found for '{field_name}': {path}",
-            detail={"path": str(path), "field": field_name},
-        )
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise GitReadError(
-            f"Dev fixture for '{field_name}' is unreadable: {exc}",
-            detail={"path": str(path), "field": field_name},
-        ) from exc
 
 
 register(agent_id=AGENT_ID, handler=run, config=_config)

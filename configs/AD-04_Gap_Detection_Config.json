@@ -49,21 +49,25 @@
   },
   "manifest": {
     "takes_from": {
-      "git": [
-        "structured_requirements"
-      ],
-      "phase_input": [
-        "business_case",
-        "project_context",
-        "scope_boundaries"
-      ]
+      "shared_folder": {
+        "subfolder": "bs_docs",
+        "formats": ["json", "docx", "pdf", "html"],
+        "fields": [
+          "structured_requirements",
+          "business_case",
+          "project_context",
+          "scope_boundaries"
+        ]
+      }
     },
     "returns": [
       "gap_report",
       "gap_summary"
     ],
     "run_id_required": true,
-    "run_id_source": "X-Run-ID header"
+    "run_id_source": "X-Run-ID header",
+    "thread_id_required": true,
+    "thread_id_source": "X-Thread-ID header"
   },
   "inputs": {
     "structured_requirements": {
@@ -149,18 +153,23 @@
   },
   "metadata": {
     "id": "AD-04",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "status": "ready_for_iteration_1",
-    "last_updated": "2026-05-13",
+    "last_updated": "2026-05-14",
     "_renamed_from": "PL-GD-01 — renamed per ADLC_Tech_Stack_Config v2.0.0"
   },
-  "dev": {
-    "enabled": true,
-    "phase_input_fixture": "tests/integration/fixtures/dev/AD-04_AI_Job_Portal_business_spec.json",
-    "git_input_fixtures": {
-    "structured_requirements": "tests/integration/fixtures/dev/AD-04_AI_Job_Portal_structured_requirements.json"
+  "supported_formats": {
+    "input": ["json", "docx", "pdf", "html"],
+    "output": ["json", "docx", "pdf", "html"],
+    "default_output": "json",
+    "freeform_extraction": {
+      "enabled": true,
+      "_note": "Free-form documents (docx/pdf/html) are parsed for text and then an LLM call extracts structured fields. No fixed template required."
+    }
   },
-    "_note": "Used only when ENV=dev AND enabled=true. phase_input_fixture replaces an empty HTTP body. git_input_fixtures override the git/local fetch for the listed fields. In prod (ENV=prod) this whole block is ignored."
+  "shared_io": {
+    "input_subfolder": "bs_docs",
+    "output_subfolder": "gap_response"
   },
   "git_reader": {
     "enabled": false,

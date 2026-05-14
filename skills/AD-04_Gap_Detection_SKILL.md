@@ -1,5 +1,5 @@
 # AD-04 · Gap Detection Agent
-## SKILL.md — v1.0.0
+## SKILL.md — v1.1.0
 
 ---
 
@@ -15,7 +15,8 @@
 | **Config file** | AD-04_Gap_Detection_Config.json |
 | **MCP tool** | run_gap_detection |
 | **Endpoint** | /agents/gap-detection |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
+| **Thread ID Header** | X-Thread-ID |
 
 ---
 
@@ -50,18 +51,77 @@ Classifies each identified gap by type and severity. Uses `gap_categories` and `
 
 ---
 
-## Inputs
+## API Contract
 
-| Field | Required | Source | On missing |
+| Header / Param | Required | Purpose |
+|---|---|---|
+| `Authorization` | Yes | Bearer token authentication |
+| `X-Run-ID` | Yes | Run tracking identifier |
+| `X-Thread-ID` | Yes | Shared folder thread resolution — determines which folder to read/write |
+| `?format=` | No | Output format: `json` (default), `docx`, `pdf`, `html` |
+
+- **HTTP body is ignored** — input is always read from the shared folder.
+- **Response:** JSON by default; file download (with `Content-Disposition`) for other formats.
+
+---
+
+## Shared Folder Convention
+
+```
+Base path:        C:\SharedFolderAdlc         (from ADLC_Tech_Stack_Config.json → shared_folder.base_path)
+Input folder:     {base_path}/{thread_id}/bs_docs/
+Output folder:    {base_path}/{thread_id}/gap_response/
+Thread ID source: X-Thread-ID header
+```
+
+**Example:**
+```
+C:\SharedFolderAdlc\
+└── threadid100\
+    ├── bs_docs\              ← Agent reads ALL files here
+    │   ├── business_spec.docx
+    │   ├── requirements.pdf
+    │   └── scope.json
+    └── gap_response\         ← Agent writes result here
+        └── AD-04_output.json
+```
+
+All supported files in `bs_docs/` are parsed and merged into a single payload. Multiple files contribute to the same payload (last writer wins for overlapping keys).
+
+---
+
+## Input Sources & Formats
+
+### Supported input formats
+
+| Format | Extension | Parsing method |
+|---|---|---|
+| JSON | `.json` | Direct parse — structured data used as-is |
+| DOCX | `.docx` | Text + tables extracted via python-docx → LLM extraction |
+| PDF | `.pdf` | Text extracted via PyPDF2 → LLM extraction |
+| HTML | `.html`, `.htm` | Text + tables extracted via BeautifulSoup → LLM extraction |
+
+### Input resolution flow
+
+1. Resolve folder: `{base_path}/{thread_id}/bs_docs/`
+2. List all files with supported extensions (sorted alphabetically)
+3. Parse each file according to its format
+4. For JSON files → structured data merges directly into payload
+5. For free-form documents (docx/pdf/html) → text is extracted, then an LLM call structures it into the expected fields (`structured_requirements`, `business_case`, `project_context`, `scope_boundaries`)
+6. All parsed results are merged into a single dict
+
+### Required fields (after merge)
+
+| Field | Required | Type | On missing |
 |---|---|---|---|
-| `structured_requirements` | Yes | Git — `runs/{run_id}/plan/PL-01_output.json` | `stop_and_report` |
-| `business_case` | Yes | phase_input (passed by GenWiz) | `stop_and_report` |
-| `project_context` | Yes | phase_input (passed by GenWiz) | `stop_and_report` |
-| `scope_boundaries` | No | phase_input (passed by GenWiz) | `proceed_without` |
+| `structured_requirements` | Yes | array (min 1 item) | `stop_and_report` |
+| `business_case` | Yes | string (non-empty) | `stop_and_report` |
+| `project_context` | Yes | object | `stop_and_report` |
+| `scope_boundaries` | No | object | `proceed_without` |
 
 ### Input validation rules
 
-**`structured_requirements`** — read from git using `run_id` from `X-Run-ID` header. Minimum 1 item. If the git file is not found or the field is empty → stop and report. Do not proceed without requirements.
+**`structured_requirements`** — minimum 1 item. If the field is empty or missing after all files are parsed → stop and report. Do not proceed without requirements.
 
 **`business_case`** — must be a non-empty string. Used to identify business goals that have no corresponding requirement. If empty → stop.
 
@@ -71,9 +131,31 @@ Classifies each identified gap by type and severity. Uses `gap_categories` and `
 
 ---
 
-## Outputs
+## Output Formats & Persistence
 
-### `gap_report`
+### Supported output formats
+
+| Format | MIME type | Description |
+|---|---|---|
+| `json` | `application/json` | Default — structured JSON response |
+| `docx` | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | Word document with summary table + gap report table |
+| `pdf` | `application/pdf` | Styled report rendered via weasyprint (HTML → PDF) |
+| `html` | `text/html` | Jinja2-templated report with severity-colored badges |
+
+### Output persistence
+
+The agent **always** writes its result to the shared output folder regardless of the HTTP response format:
+
+```
+{base_path}/{thread_id}/gap_response/AD-04_output.json     (when format=json)
+{base_path}/{thread_id}/gap_response/AD-04_output_{run_id}.docx  (when format=docx)
+{base_path}/{thread_id}/gap_response/AD-04_output_{run_id}.pdf   (when format=pdf)
+{base_path}/{thread_id}/gap_response/AD-04_output_{run_id}.html  (when format=html)
+```
+
+### Output schema
+
+#### `gap_report`
 
 Array of gap objects. One item per gap found. Empty array if no gaps found.
 
@@ -91,7 +173,7 @@ Array of gap objects. One item per gap found. Empty array if no gaps found.
 
 `req_id_ref` is `null` for implied but unstated requirements that have no REQ-### in the structured requirements.
 
-### `gap_summary`
+#### `gap_summary`
 
 ```json
 {
@@ -195,12 +277,15 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 
 | Situation | Action |
 |---|---|
-| `structured_requirements` empty | Stop. Report: `"structured_requirements is empty"` |
-| Git file not found for run_id | Stop. Report: `"PL-01 output not found in git for run_id"` |
-| `business_case` empty | Stop. Report: `"business_case is empty"` |
+| Input folder (`bs_docs/`) not found | 400 error: `"Input folder not found"` |
+| No supported files in input folder | 400 error: `"No supported input files found"` |
+| Free-form doc with no extractable text | 400 error from parser |
+| `structured_requirements` empty after parse | Stop. Report: `"structured_requirements is empty"` |
+| `business_case` empty after parse | Stop. Report: `"business_case is empty"` |
 | No gaps found | Return empty `gap_report`, `overall_quality: clean`, `recommendation: proceed` |
 | `scope_boundaries` absent | Skip out_of_scope_not_flagged checks. Proceed with remaining checks. |
 | Same gap appears in multiple categories | Pick the most specific category. One gap — one category. |
+| Unsupported output format requested | 400 error with list of supported formats |
 
 ---
 
@@ -218,6 +303,10 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 | AC-08 | recommendation correct | Follows decision table above |
 | AC-09 | No invented gaps | Every gap traceable to a specific requirement or business goal |
 | AC-10 | Clean report on zero gaps | Empty array returned, not null |
+| AC-11 | Multi-format input | Agent accepts and correctly parses json, docx, pdf, html from shared folder |
+| AC-12 | Multi-format output | Agent renders result in requested format (json, docx, pdf, html) |
+| AC-13 | Shared folder write | Output is persisted to `gap_response/` subfolder |
+| AC-14 | Thread ID required | Request without X-Thread-ID is rejected with 422 |
 
 ---
 
