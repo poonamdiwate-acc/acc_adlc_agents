@@ -44,12 +44,13 @@ def create_app() -> FastAPI:
         exempt_paths=("/health", "/ready"),
     )
 
-    # Import order matters: health and agents both read the registry at
-    # import time, and `agents` must run after `bootstrap()`.
-    from api.routers import agents, health
+    # Import order matters: health, agents, and a2a all read the registry
+    # at import time, so they must run after `bootstrap()`.
+    from api.routers import a2a, agents, health
 
     app.include_router(health.router)
     app.include_router(agents.router)
+    app.include_router(a2a.router)
 
     return app
 
@@ -60,6 +61,8 @@ def _configure_logging(level: Optional[str] = None) -> None:
         level=getattr(logging, chosen, logging.INFO),
         format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
     )
+    # Silence noisy google-genai AFC info messages
+    logging.getLogger("google_genai.models").setLevel(logging.WARNING)
 
 
 app = create_app()

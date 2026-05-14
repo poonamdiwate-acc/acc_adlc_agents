@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ agent_id }} — Report ({{ run_id }})</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        h1 { color: #1a365d; border-bottom: 3px solid #2b6cb0; padding-bottom: 0.5rem; }
+        h2 { color: #2d3748; margin-top: 2rem; }
+        .meta { color: #718096; font-size: 0.9rem; margin-bottom: 2rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+        th { background: #edf2f7; font-weight: 600; }
+        tr:nth-child(even) { background: #f7fafc; }
+        pre {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ agent_id }} — Agent Report</h1>
+    <div class="meta">Run ID: {{ run_id }}</div>
+
+    {% for key, value in result.items() %}
+    <h2>{{ key | replace('_', ' ') | title }}</h2>
+    {% if value is mapping %}
+    <table>
+        {% for k, v in value.items() %}
+        <tr>
+            <th>{{ k | replace('_', ' ') | title }}</th>
+            <td>{% if v is mapping or v is iterable and v is not string %}<pre>{{ v | tojson(indent=2) }}</pre>{% else %}{{ v }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% elif value is iterable and value is not string %}
+    {% if value and value[0] is mapping %}
+    <table>
+        <thead>
+            <tr>
+                {% for col in value[0].keys() %}
+                <th>{{ col | replace('_', ' ') | title }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in value %}
+            <tr>
+                {% for col in item.values() %}
+                <td>{% if col is mapping or col is iterable and col is not string %}<pre>{{ col | tojson(indent=2) }}</pre>{% else %}{{ col }}{% endif %}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <pre>{{ value | tojson(indent=2) }}</pre>
+    {% endif %}
+    {% else %}
+    <p>{{ value }}</p>
+    {% endif %}
+    {% endfor %}
+</body>
+</html>
