@@ -1,0 +1,93 @@
+{
+  "run_id": "{run_id}",
+  "agent_id": "AD-01",
+  "phase": "plan",
+  "structured_requirements": [
+    {
+      "req_id": "REQ-001",
+      "title": "Candidate registration",
+      "description": "Candidates must be able to register with email and password and verify ownership via an email confirmation link.",
+      "type": "functional",
+      "priority": "high",
+      "acceptance_criterion": "New candidate completes registration in under 90 seconds; verification email sent within 30 seconds.",
+      "source_ref": "section_2_candidate_workflow",
+      "confidence": "high"
+    },
+    {
+      "req_id": "REQ-002",
+      "title": "Resume upload",
+      "description": "Candidates can upload a resume document (PDF, DOCX) up to 10MB during application submission.",
+      "type": "functional",
+      "priority": "high",
+      "acceptance_criterion": "Upload completes within 5 seconds for files up to 10MB on a 10Mbps connection.",
+      "source_ref": "section_2_candidate_workflow",
+      "confidence": "high"
+    },
+    {
+      "req_id": "REQ-003",
+      "title": "Recruiter dashboard responsiveness",
+      "description": "Recruiters can view all submitted applications for their open roles. Dashboard must load within p95 < 2 seconds for up to 500 applications.",
+      "type": "non_functional",
+      "subtype": "performance",
+      "priority": "critical",
+      "acceptance_criterion": "p95 response time < 2s with 500 concurrent applications loaded.",
+      "source_ref": "section_3_recruiter_workflow",
+      "confidence": "high"
+    },
+    {
+      "req_id": "REQ-004",
+      "title": "System availability",
+      "description": "The platform must maintain 99.9% uptime during business hours (6am-midnight local time).",
+      "type": "non_functional",
+      "subtype": "availability",
+      "priority": "critical",
+      "acceptance_criterion": "Monthly uptime >= 99.9% measured at the load balancer.",
+      "source_ref": "section_5_sla",
+      "confidence": "high"
+    },
+    {
+      "req_id": "REQ-005",
+      "title": "User authentication security",
+      "description": "All user-facing endpoints must require authentication via OAuth 2.0. Tokens must expire within 15 minutes. The system must comply with SOC2 Type II requirements.",
+      "type": "non_functional",
+      "subtype": "security",
+      "priority": "critical",
+      "acceptance_criterion": "No unauthenticated access possible; token expiry enforced; SOC2 audit passing.",
+      "source_ref": "section_6_security",
+      "confidence": "high"
+    },
+    {
+      "req_id": "REQ-006",
+      "title": "AI matching pipeline throughput",
+      "description": "The AI matching pipeline must process at least 1000 candidate-role match requests per minute during peak hours.",
+      "type": "non_functional",
+      "subtype": "performance",
+      "priority": "high",
+      "acceptance_criterion": "Sustained throughput of 1000 req/min with p99 latency < 5s.",
+      "source_ref": "section_4_ai_matching",
+      "confidence": "high"
+    },
+    {
+      "req_id": "REQ-007",
+      "title": "Data encryption at rest",
+      "description": "All personal data (PII) must be encrypted at rest using AES-256. Encryption keys must be rotated every 90 days.",
+      "type": "non_functional",
+      "subtype": "security",
+      "priority": "critical",
+      "acceptance_criterion": "All storage volumes encrypted; key rotation automated and verified quarterly.",
+      "source_ref": "section_6_security",
+      "confidence": "high"
+    },
+    {
+      "req_id": "REQ-008",
+      "title": "Observability and monitoring",
+      "description": "All services must emit structured logs, expose health endpoints, and report metrics to a central dashboard. Alerts must fire within 60 seconds of SLO breach.",
+      "type": "non_functional",
+      "subtype": "observability",
+      "priority": "high",
+      "acceptance_criterion": "All services have /health endpoint; alerts fire within 60s; dashboard shows real-time metrics.",
+      "source_ref": "section_7_operations",
+      "confidence": "high"
+    }
+  ]
+}

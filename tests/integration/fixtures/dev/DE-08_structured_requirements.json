@@ -1,0 +1,68 @@
+{
+  "structured_requirements": [
+    {
+      "req_id": "REQ-001",
+      "title": "Candidate Registration",
+      "description": "Candidates must be able to register, verify email, and create a profile within 90 seconds. Expected 5000 new registrations per day at peak.",
+      "type": "functional",
+      "acceptance_criteria": ["Registration completes in P95 < 90 seconds", "Email verification dispatched within 30 seconds"],
+      "nfr_hints": {"throughput": "5000 registrations/day", "latency": "P95 < 90s"}
+    },
+    {
+      "req_id": "REQ-002",
+      "title": "Resume Upload and Storage",
+      "description": "Candidates upload resumes (PDF/DOCX, max 10MB). System must store and index for search. Expected 3000 uploads/day, 50GB/month storage growth.",
+      "type": "functional",
+      "acceptance_criteria": ["Upload completes in P95 < 5 seconds for 10MB on 10Mbps", "Resume searchable within 60 seconds of upload"],
+      "nfr_hints": {"storage_growth": "50GB/month", "throughput": "3000 uploads/day"}
+    },
+    {
+      "req_id": "REQ-003",
+      "title": "Recruiter Dashboard Performance",
+      "description": "Recruiter dashboard must load within 2 seconds showing up to 500 applications. Support 200 concurrent recruiters.",
+      "type": "non_functional",
+      "acceptance_criteria": ["Dashboard loads in P95 < 2 seconds with 500 applications", "200 concurrent recruiter sessions supported"],
+      "nfr_hints": {"latency": "P95 < 2s", "concurrency": "200 sessions"}
+    },
+    {
+      "req_id": "REQ-004",
+      "title": "System Availability",
+      "description": "System must maintain 99.9% uptime during business hours (6am-midnight). Maximum 8.7 hours downtime per year.",
+      "type": "non_functional",
+      "acceptance_criteria": ["99.9% uptime measured at load balancer", "Failover completes within 30 seconds"],
+      "nfr_hints": {"availability": "99.9%", "rto": "30 seconds"}
+    },
+    {
+      "req_id": "REQ-005",
+      "title": "Authentication and Security",
+      "description": "OAuth 2.0 authentication for all user-facing endpoints. SOC2 Type II compliance required. Token expiry 15 minutes.",
+      "type": "non_functional",
+      "acceptance_criteria": ["OAuth 2.0 enforced on all endpoints", "SOC2 Type II audit passing"],
+      "nfr_hints": {"compliance": "SOC2 Type II"}
+    },
+    {
+      "req_id": "REQ-006",
+      "title": "AI Matching Pipeline",
+      "description": "AI matching service must sustain 1000 requests/minute during peak hours with P99 latency < 5 seconds. Requires GPU inference.",
+      "type": "functional",
+      "acceptance_criteria": ["Sustain 1000 RPM", "P99 < 5 seconds", "Match accuracy > 85%"],
+      "nfr_hints": {"throughput": "1000 RPM", "latency": "P99 < 5s", "compute": "GPU required"}
+    },
+    {
+      "req_id": "REQ-007",
+      "title": "Data Encryption",
+      "description": "All data at rest encrypted with AES-256. Key rotation every 90 days. Applies to all databases and object storage.",
+      "type": "non_functional",
+      "acceptance_criteria": ["AES-256 encryption verified on all stores", "Key rotation automated every 90 days"],
+      "nfr_hints": {"encryption": "AES-256", "key_rotation": "90 days"}
+    },
+    {
+      "req_id": "REQ-008",
+      "title": "Observability and Monitoring",
+      "description": "All services emit structured logs to central aggregator. Alerts fire within 60 seconds of SLO breach. Health endpoints on all services.",
+      "type": "non_functional",
+      "acceptance_criteria": ["Structured logs from all services", "Alerts within 60s of breach", "/health returns 200 within 1s"],
+      "nfr_hints": {"observability": "structured logging", "alerting": "< 60s"}
+    }
+  ]
+}

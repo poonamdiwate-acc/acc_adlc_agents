@@ -19,9 +19,12 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from core.agent_registry import AgentNotFound, get_registry
+
+_bearer_scheme = HTTPBearer(description="Enter your ADLC_API_KEY token")
 from core.config_loader import get_config
 from core.exceptions import (
     ADLCError,
@@ -46,6 +49,10 @@ def _maybe_load_dev_fixture(agent_id: str) -> Optional[Dict[str, Any]]:
 
     Any other case (no block, disabled, missing/invalid file) returns
     None and lets the normal validation flow surface the missing inputs.
+
+    If ``dev.phase_input_text_files`` is declared, raw text files are
+    loaded into the corresponding payload fields (overwriting empty values
+    from the JSON fixture).
     """
     if os.environ.get("ENV", "").lower() != "dev":
         return None
@@ -82,6 +89,30 @@ def _maybe_load_dev_fixture(agent_id: str) -> Optional[Dict[str, Any]]:
             agent_id, full_path, type(content).__name__,
         )
         return None
+
+    text_files = dev_block.get("phase_input_text_files")
+    if isinstance(text_files, dict):
+        for field_name, rel_path in text_files.items():
+            if not isinstance(rel_path, str) or not rel_path.strip():
+                continue
+            text_path = (cfg.project_root() / rel_path).resolve()
+            if text_path.is_file():
+                try:
+                    content[field_name] = text_path.read_text(encoding="utf-8")
+                    logger.info(
+                        "Dev text file loaded: agent=%s field=%s path=%s",
+                        agent_id, field_name, text_path,
+                    )
+                except OSError as exc:
+                    logger.warning(
+                        "Dev text file unreadable: agent=%s field=%s err=%s",
+                        agent_id, field_name, exc,
+                    )
+            else:
+                logger.warning(
+                    "Dev text file missing: agent=%s field=%s path=%s",
+                    agent_id, field_name, text_path,
+                )
 
     logger.info(
         "Dev fixture loaded for empty body: agent=%s path=%s",
@@ -132,6 +163,7 @@ def _make_handler(endpoint: str):
     async def handler(
         request: Request,
         x_run_id: str = Header(..., alias="X-Run-ID"),
+        _credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
     ) -> Dict[str, Any]:
         try:
             entry = get_registry().get_by_endpoint(endpoint)

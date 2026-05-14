@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head><title>AI Job Portal — Agent Network</title></head>
+<body>
+<h1>AI Job Portal — Business Process Agent Network</h1>
+<p>This diagram shows the service topology for the AI Job Portal platform.</p>
+
+<pre class="mermaid">
+graph TD
+    LB[Load Balancer] --> API[API Gateway]
+    API --> AUTH[Auth Service]
+    API --> CANDIDATE[Candidate Service]
+    API --> RECRUITER[Recruiter Service]
+    API --> MATCH[AI Matching Service]
+    CANDIDATE --> DB_CAND[(Candidate DB)]
+    RECRUITER --> DB_REC[(Recruiter DB)]
+    MATCH --> VECTOR[(Vector Store)]
+    MATCH --> ML[ML Model Service]
+    AUTH --> CACHE[(Redis Session Cache)]
+    AUTH --> IDP[External: Identity Provider]
+    CANDIDATE --> STORAGE[Object Storage - Resumes]
+    RECRUITER --> NOTIFY[Notification Service]
+    NOTIFY --> EMAIL[External: Email Provider]
+    NOTIFY --> SMS[External: SMS Gateway]
+    API --> MONITOR[Monitoring Agent]
+    MONITOR --> METRICS[(Prometheus)]
+    MONITOR --> LOGS[(Log Aggregator)]
+</pre>
+
+<h2>Service Responsibilities</h2>
+<ul>
+  <li><strong>API Gateway</strong>: Single entry point. Rate limiting, request routing, TLS termination.</li>
+  <li><strong>Auth Service</strong>: OAuth 2.0 token issuance, session management, RBAC enforcement.</li>
+  <li><strong>Candidate Service</strong>: Registration, profile management, resume upload, application tracking.</li>
+  <li><strong>Recruiter Service</strong>: Job posting, application review, candidate shortlisting.</li>
+  <li><strong>AI Matching Service</strong>: Vector similarity search, ML-based role-candidate matching.</li>
+  <li><strong>Notification Service</strong>: Email and SMS dispatch for application status updates.</li>
+  <li><strong>Monitoring Agent</strong>: Health checks, metric collection, log forwarding, alerting.</li>
+</ul>
+
+<h2>External Interfaces (Trust Boundary Crossings)</h2>
+<ul>
+  <li>Identity Provider (OAuth federation)</li>
+  <li>Email Provider (SMTP/API)</li>
+  <li>SMS Gateway (API)</li>
+  <li>Public Internet (via Load Balancer)</li>
+</ul>
+
+<h2>Data Flows</h2>
+<ul>
+  <li>Candidate → API Gateway → Candidate Service → Candidate DB (sync, HTTPS)</li>
+  <li>Recruiter → API Gateway → Recruiter Service → Recruiter DB (sync, HTTPS)</li>
+  <li>AI Matching → Vector Store (sync, gRPC)</li>
+  <li>Auth Service → Redis (sync, TCP)</li>
+  <li>Notification Service → Email/SMS providers (async, queue-backed)</li>
+</ul>
+</body>
+</html>

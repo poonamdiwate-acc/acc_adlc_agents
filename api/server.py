@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         BearerTokenMiddleware,
-        exempt_paths=("/health", "/ready"),
+        exempt_paths=("/health", "/ready", "/docs", "/openapi.json", "/redoc"),
     )
 
     # Import order matters: health and agents both read the registry at

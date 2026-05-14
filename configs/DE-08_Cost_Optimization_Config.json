@@ -1,0 +1,203 @@
+{
+  "_readme": "DE-08 Cost & Optimization Agent config. Estimates and optimizes cloud and infrastructure costs based on tech stack choices and usage projections.",
+
+  "agent": {
+    "id":            "DE-08",
+    "name":          "Cost & Optimization Agent",
+    "version":       "1.0.0",
+    "description":   "Accepts structured requirements and architecture context to produce Total Cost of Ownership estimates and prioritized optimization recommendations.",
+    "phase":         "design",
+    "standalone":    true,
+    "endpoint":      "/agents/cost-optimization",
+    "mcp_tool_name": "run_cost_optimization",
+    "skill_file":    "DE-08_Cost_Optimization_SKILL.md",
+    "step_number":   13,
+    "previous_step": {
+      "step_number": 7,
+      "agent_id":    "AD-07",
+      "agent_name":  "FinOps Architect"
+    }
+  },
+
+  "llm_config_override": {
+    "max_tokens":      12288,
+    "timeout_seconds": 75
+  },
+
+  "behaviour": {
+    "on_empty_requirements":     "stop_and_report",
+    "on_no_estimates_derived":   "return_minimal_estimate",
+    "on_low_confidence":         "flag_and_continue",
+    "min_requirements":          1,
+    "cost_categories": [
+      "compute",
+      "storage",
+      "network",
+      "third_party",
+      "licensing",
+      "managed_services"
+    ],
+    "optimization_types": [
+      "reservation",
+      "right_sizing",
+      "autoscaling",
+      "architecture_change",
+      "tier_optimization",
+      "elimination"
+    ],
+    "priority_levels": [
+      "critical",
+      "high",
+      "medium",
+      "low"
+    ],
+    "confidence_levels": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "blocking_confidence": [
+      "low"
+    ],
+    "_blocking_note": "Cost line items or optimization recommendations produced with low confidence are flagged as blocking — must be reviewed before downstream agents (e.g. Design Review, FinOps) consume the estimates."
+  },
+
+  "manifest": {
+    "takes_from": {
+      "git":         ["structured_requirements"],
+      "phase_input": ["agent_network_html"]
+    },
+    "returns":         ["cost_estimate", "optimization_plan"],
+    "run_id_required": true,
+    "run_id_source":   "X-Run-ID header"
+  },
+
+  "inputs": {
+    "structured_requirements": {
+      "required":   true,
+      "type":       "array",
+      "git_path":   "runs/{run_id}/plan/AD-01_output.json",
+      "json_field": "structured_requirements",
+      "min_items":  1,
+      "on_fail":    "stop_and_report"
+    },
+    "agent_network_html": {
+      "required":    true,
+      "type":        "string",
+      "description": "Raw HTML content of the agent-network / business-process diagram. Drives per-service cost estimation — extract services, data stores, external integrations, and communication patterns from the embedded diagram and surrounding markup.",
+      "on_fail":     "stop_and_report"
+    }
+  },
+
+  "outputs": {
+    "cost_estimate": {
+      "type":        "object",
+      "description": "Total Cost of Ownership breakdown by service and cost category, with monthly and annual projections.",
+      "schema": {
+        "total_monthly_usd": "number",
+        "total_annual_usd":  "number",
+        "line_items": [
+          {
+            "cost_id":      "CE-### sequential",
+            "service":      "string — service name from agent_network_html",
+            "category":     "compute | storage | network | third_party | licensing | managed_services",
+            "description":  "string",
+            "monthly_usd":  "number",
+            "rationale":    "string — why this cost exists and how it was estimated",
+            "confidence":   "high | medium | low",
+            "req_id_refs":  ["REQ-### from structured_requirements"]
+          }
+        ],
+        "assumptions": ["string — key assumptions behind the estimates"],
+        "overall_confidence": "high | medium | low",
+        "recommendation": "proceed | optimize_first | blocked"
+      }
+    },
+    "optimization_plan": {
+      "type":        "array",
+      "description": "Prioritized list of cost optimization recommendations with estimated savings.",
+      "item_schema": {
+        "opt_id":                       "OPT-### sequential",
+        "title":                        "string",
+        "category":                     "reservation | right_sizing | autoscaling | architecture_change | tier_optimization | elimination",
+        "description":                  "string",
+        "estimated_savings_pct":        "number — percentage reduction on affected line items",
+        "estimated_savings_monthly_usd": "number",
+        "priority":                     "critical | high | medium | low",
+        "trade_off":                    "string — what you give up for the savings",
+        "confidence":                   "high | medium | low",
+        "req_id_refs":                  ["REQ-### from structured_requirements"]
+      }
+    }
+  },
+
+  "skills": {
+    "cost_modeling": {
+      "enabled":     true,
+      "description": "Builds per-service cost models from structured_requirements usage hints and service topology from agent_network_html. Estimates compute, storage, network, and third-party costs."
+    },
+    "resource_optimization": {
+      "enabled":     true,
+      "description": "Identifies right-sizing opportunities, reserved instance commitments, autoscaling strategies, and architectural simplifications that reduce cost without degrading service quality."
+    },
+    "finops_awareness": {
+      "enabled":     true,
+      "description": "Applies FinOps principles — cost allocation tagging, showback/chargeback structures, budget alerting thresholds, and unit economics per service."
+    }
+  },
+
+  "tools": {
+    "cost_calculator": {
+      "enabled":     true,
+      "description": "Estimates per-service monthly/annual cloud costs based on usage projections from structured_requirements and service topology from agent_network_html."
+    },
+    "sizing_advisor": {
+      "enabled":     true,
+      "description": "Recommends instance types, storage tiers, and capacity reservations based on throughput/latency requirements and data volume estimates."
+    },
+    "finops_dashboard": {
+      "enabled":     true,
+      "description": "Structures cost data into FinOps-ready outputs — tagging strategies, budget thresholds, cost anomaly alerting rules per service."
+    }
+  },
+
+  "git_reader": {
+    "enabled":           false,
+    "repo_url":          "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":       "ENV:GIT_TOKEN",
+    "branch":            "main",
+    "run_id_source":     "header",
+    "run_id_header":     "X-Run-ID",
+    "read_path_pattern": "runs/{run_id}/{phase}/{agent_id}_output.json",
+    "phase":             "plan",
+    "_enabled_note": "false -> read from local files under tech_stack.git_reader.local_audit_dir. true -> read from the real audit repo via GitPython. Toggle per environment.",
+    "_note": "run_id is passed by GenWiz as X-Run-ID header on every agent call. Agent uses it to resolve the path and read previous step output."
+  },
+
+  "git_writer": {
+    "repo_url":           "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":        "ENV:GIT_TOKEN",
+    "branch":             "main",
+    "write_path_pattern": "runs/{run_id}/design/cost_estimate_and_optimization_plan.json",
+    "commit_msg_pattern": "feat(DE-08): Cost & Optimization Agent · {run_id}"
+  },
+
+  "dev": {
+    "enabled": true,
+    "phase_input_fixture": "tests/integration/fixtures/dev/DE-08_phase_input.json",
+    "git_input_fixtures": {
+      "structured_requirements": "tests/integration/fixtures/dev/DE-08_structured_requirements.json"
+    },
+    "phase_input_text_files": {
+      "agent_network_html": "tests/integration/fixtures/dev/Business_Process_Agent_Network.html"
+    },
+    "_note": "Used only when ENV=dev AND enabled=true. phase_input_fixture replaces an empty HTTP body. git_input_fixtures override the git/local fetch for the listed fields. phase_input_text_files load raw text files (HTML/MD/TXT) into the listed payload fields. In prod (ENV=prod) this whole block is ignored."
+  },
+
+  "metadata": {
+    "id":           "DE-08",
+    "version":      "1.0.0",
+    "status":       "ready_for_iteration_1",
+    "last_updated": "2026-05-14"
+  }
+}

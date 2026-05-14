@@ -1,0 +1,220 @@
+{
+  "_readme": "DE-06 Non-Functional Design Agent config. Ensures production-grade quality — scalability, resilience, security, observability.",
+
+  "agent": {
+    "id":            "DE-06",
+    "name":          "Non-Functional Design Agent",
+    "version":       "1.0.0",
+    "description":   "Analyses structured requirements and architecture context to produce non-functional requirement specifications (scalability, performance, availability, security, observability, resilience) and a security controls matrix.",
+    "phase":         "design",
+    "standalone":    true,
+    "endpoint":      "/agents/non-functional-design",
+    "mcp_tool_name": "run_non_functional_design",
+    "skill_file":    "DE-06_Non_Functional_Design_SKILL.md",
+    "step_number":   12,
+    "previous_step": {
+      "step_number": 7,
+      "agent_id":    "AD-07",
+      "agent_name":  "FinOps Architect"
+    }
+  },
+
+  "llm_config_override": {
+    "max_tokens":      16384,
+    "timeout_seconds": 90
+  },
+
+  "behaviour": {
+    "on_empty_requirements":  "stop_and_report",
+    "on_no_nfrs_derived":     "return_minimal_spec",
+    "on_low_confidence":      "flag_and_continue",
+    "min_requirements":       1,
+    "nfr_categories": [
+      "scalability",
+      "performance",
+      "availability",
+      "security",
+      "observability",
+      "resilience"
+    ],
+    "priority_levels": [
+      "critical",
+      "high",
+      "medium",
+      "low"
+    ],
+    "blocking_priorities": [
+      "critical",
+      "high"
+    ],
+    "_blocking_note": "NFRs with critical or high priority that have confidence: low are blocking — must be resolved before downstream agents (e.g. Technology Selection, Hardening) consume the spec.",
+    "confidence_levels": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "blocking_confidence": [
+      "low"
+    ],
+    "security_control_domains": [
+      "authentication",
+      "authorization",
+      "encryption",
+      "network_security",
+      "data_protection",
+      "audit_logging",
+      "compliance"
+    ]
+  },
+
+  "manifest": {
+    "takes_from": {
+      "git":         ["structured_requirements"],
+      "phase_input": ["agent_network_html"]
+    },
+    "returns":         ["nfr_specifications", "security_controls"],
+    "run_id_required": true,
+    "run_id_source":   "X-Run-ID header"
+  },
+
+  "inputs": {
+    "structured_requirements": {
+      "required":   true,
+      "type":       "array",
+      "git_path":   "runs/{run_id}/plan/AD-01_output.json",
+      "json_field": "structured_requirements",
+      "min_items":  1,
+      "on_fail":    "stop_and_report"
+    },
+    "agent_network_html": {
+      "required":    true,
+      "type":        "string",
+      "description": "Raw HTML content of the agent-network / business-process diagram. Drives service-boundary, integration-pattern, and threat-surface decisions — extract services, data flows, external interfaces, and trust boundaries from the embedded diagram and surrounding markup.",
+      "on_fail":     "stop_and_report"
+    }
+  },
+
+  "outputs": {
+    "nfr_specifications": {
+      "type":        "array",
+      "description": "One item per non-functional requirement identified. Each item specifies category, target metric, threshold, and priority.",
+      "item_schema": {
+        "nfr_id":         "NFR-### sequential",
+        "nfr_name":       "string",
+        "category":       "scalability | performance | availability | security | observability | resilience",
+        "description":    "string",
+        "target_metric":  "string — the measurable indicator (e.g. p95 latency, uptime %, RPS)",
+        "threshold":      "string — the target value (e.g. < 200ms, 99.95%, 10000 RPS)",
+        "priority":       "critical | high | medium | low",
+        "confidence":     "high | medium | low",
+        "rationale":      "string — why this threshold was chosen",
+        "req_id_refs":    ["REQ-### from structured_requirements"]
+      }
+    },
+    "security_controls": {
+      "type":        "object",
+      "description": "Security controls matrix covering authentication, authorization, encryption, network security, data protection, audit logging, and compliance mappings.",
+      "schema": {
+        "controls": [
+          {
+            "control_id":   "SC-### sequential",
+            "domain":       "authentication | authorization | encryption | network_security | data_protection | audit_logging | compliance",
+            "name":         "string",
+            "description":  "string",
+            "mechanism":    "string — specific technology or pattern",
+            "rationale":    "string",
+            "confidence":   "high | medium | low",
+            "req_id_refs":  ["REQ-### from structured_requirements"]
+          }
+        ],
+        "threat_surface_summary": "string — high-level summary of identified threat surfaces from agent_network_html",
+        "compliance_mappings": [
+          {
+            "standard":     "string — e.g. SOC2, ISO27001, GDPR, PCI-DSS",
+            "applicable_controls": ["SC-### references"]
+          }
+        ],
+        "overall_posture":  "strong | adequate | needs_hardening | weak",
+        "recommendation":   "proceed | needs_hardening | blocked"
+      }
+    }
+  },
+
+  "skills": {
+    "scalability_design": {
+      "enabled":     true,
+      "description": "Designs horizontal and vertical scaling strategies, capacity plans, load distribution patterns, and performance targets from SLA requirements and architecture context."
+    },
+    "security_architecture": {
+      "enabled":     true,
+      "description": "Defines security controls, threat mitigations, authentication/authorization patterns, encryption strategies, and compliance mappings based on trust boundaries extracted from the architecture."
+    },
+    "observability_design": {
+      "enabled":     true,
+      "description": "Designs logging, monitoring, distributed tracing, alerting rules, and SLO/SLI definitions to ensure production observability across all services."
+    },
+    "resilience_design": {
+      "enabled":     true,
+      "description": "Defines fault tolerance patterns (circuit breakers, retries, bulkheads), disaster recovery objectives (RPO/RTO), and degradation strategies for each service boundary."
+    },
+    "compliance_mapping": {
+      "enabled":     false,
+      "_note": "Deferred. Would map security controls to specific regulatory frameworks (SOC2, ISO27001, PCI-DSS) with evidence requirements per control."
+    }
+  },
+
+  "tools": {
+    "load_modeler": {
+      "enabled":     true,
+      "description": "Models expected load patterns, peak traffic, and capacity requirements from structured_requirements volume/throughput hints and service topology from agent_network_html."
+    },
+    "security_scanner": {
+      "enabled":     true,
+      "description": "Scans the architecture topology (from agent_network_html) for security vulnerabilities — exposed interfaces, missing encryption boundaries, unprotected data flows."
+    },
+    "slo_definer": {
+      "enabled":     true,
+      "description": "Derives SLOs and SLIs from SLA requirements in structured_requirements. Calculates error budgets and alerting thresholds per service."
+    }
+  },
+
+  "git_reader": {
+    "enabled":           false,
+    "repo_url":          "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":       "ENV:GIT_TOKEN",
+    "branch":            "main",
+    "run_id_source":     "header",
+    "run_id_header":     "X-Run-ID",
+    "read_path_pattern": "runs/{run_id}/{phase}/{agent_id}_output.json",
+    "phase":             "plan",
+    "_enabled_note": "false → read from local files under tech_stack.git_reader.local_audit_dir. true → read from the real audit repo via GitPython. Toggle per environment.",
+    "_note": "run_id is passed by GenWiz as X-Run-ID header on every agent call. Agent uses it to resolve the path and read previous step output."
+  },
+
+  "git_writer": {
+    "repo_url":           "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":        "ENV:GIT_TOKEN",
+    "branch":             "main",
+    "write_path_pattern": "runs/{run_id}/design/non_functional_design_spec_and_security_controls.json",
+    "commit_msg_pattern": "feat(DE-06): Non-Functional Design Agent · {run_id}"
+  },
+
+  "dev": {
+    "enabled": true,
+    "phase_input_fixture": "tests/integration/fixtures/dev/DE-06_phase_input.json",
+    "git_input_fixtures": {
+      "structured_requirements": "tests/integration/fixtures/dev/DE-06_structured_requirements.json"
+    },
+    "phase_input_text_files": {
+      "agent_network_html": "tests/integration/fixtures/dev/Business_Process_Agent_Network.html"
+    },
+    "_note": "Used only when ENV=dev AND enabled=true. phase_input_fixture replaces an empty HTTP body. git_input_fixtures override the git/local fetch for the listed fields. phase_input_text_files load raw text files (HTML/MD/TXT) into the listed payload fields. In prod (ENV=prod) this whole block is ignored."
+  },
+
+  "metadata": {
+    "id":           "DE-06",
+    "version":      "1.0.0",
+    "status":       "ready_for_iteration_1",
+    "last_updated": "2026-05-14"
+  }
+}
