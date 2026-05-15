@@ -1,0 +1,32 @@
+[
+  {
+    "standard": "HIPAA Security Rule",
+    "article": "164.312(a)",
+    "clause": "Access control — unique user identification for all system users",
+    "mandatory": true
+  },
+  {
+    "standard": "HIPAA Security Rule",
+    "article": "164.312(e)",
+    "clause": "Transmission security — encryption of PHI in transit",
+    "mandatory": true
+  },
+  {
+    "standard": "HIPAA Privacy Rule",
+    "article": "164.524",
+    "clause": "Patient right to access their own health records within 30 days",
+    "mandatory": true
+  },
+  {
+    "standard": "HIPAA Breach Notification",
+    "article": "164.404",
+    "clause": "Notification to affected individuals within 60 days of breach discovery",
+    "mandatory": true
+  },
+  {
+    "standard": "21 CFR Part 11",
+    "article": "11.10",
+    "clause": "Electronic records must have audit trails showing create/modify/delete with timestamps",
+    "mandatory": true
+  }
+]

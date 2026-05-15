@@ -1,0 +1,50 @@
+[
+  {
+    "standard": "RBI KYC Guidelines",
+    "article": "2.4",
+    "clause": "Customer identity verification mandatory before account opening",
+    "mandatory": true
+  },
+  {
+    "standard": "RBI KYC Guidelines",
+    "article": "3.1",
+    "clause": "Re-verification of customer identity at periodic intervals not exceeding 2 years for high-risk customers",
+    "mandatory": true
+  },
+  {
+    "standard": "RBI Data Localisation",
+    "article": "1.2",
+    "clause": "All payment system data must be stored only in India",
+    "mandatory": true
+  },
+  {
+    "standard": "SEBI Cybersecurity Framework",
+    "article": "4.3",
+    "clause": "Audit trail of all transactions must be maintained for minimum 5 years",
+    "mandatory": true
+  },
+  {
+    "standard": "RBI Digital Lending Guidelines",
+    "article": "6.1",
+    "clause": "Explicit consent from borrower before accessing mobile data",
+    "mandatory": true
+  },
+  {
+    "standard": "RBI Digital Lending Guidelines",
+    "article": "6.4",
+    "clause": "Grievance redressal mechanism with resolution within 30 days",
+    "mandatory": true
+  },
+  {
+    "standard": "IT Act 2000 — Section 43A",
+    "article": "43A",
+    "clause": "Reasonable security practices for sensitive personal data",
+    "mandatory": true
+  },
+  {
+    "standard": "RBI Outsourcing Guidelines",
+    "article": "3.2",
+    "clause": "Third-party service providers must comply with same data protection standards",
+    "mandatory": true
+  }
+]

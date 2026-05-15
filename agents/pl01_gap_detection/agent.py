@@ -1,4 +1,4 @@
-"""AD-04 — Gap Detection Agent entry point.
+"""PL-01 — Gap Detection Agent entry point.
 
 Standalone async handler matching the ``AgentHandler`` signature in
 :mod:`core.agent_registry`. The handler:
@@ -21,9 +21,10 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Any, Dict
 
-from agents.ad04_gap_detection import behaviour, input_builder, output_parser
+from agents.pl01_gap_detection import behaviour, input_builder, output_parser
 from core.agent_registry import register
 from core.config_loader import get_config
 from core.llm_client import LLMClient
@@ -32,7 +33,7 @@ from gitops.git_reader import GitReader, create_git_reader
 
 logger = logging.getLogger(__name__)
 
-AGENT_ID = "AD-04"
+AGENT_ID = "PL-01"
 
 
 _config = get_config()
@@ -50,7 +51,7 @@ _git_reader: GitReader = create_git_reader(
 )
 
 logger.info(
-    "AD-04 initialised: git_reader=%s endpoint=%s",
+    "PL-01 initialised: git_reader=%s endpoint=%s",
     type(_git_reader).__name__,
     _agent_cfg.get("agent", {}).get("endpoint"),
 )
@@ -67,9 +68,14 @@ async def run(payload: Dict[str, Any], run_id: str) -> Dict[str, Any]:
     resolved = await _resolve_git_inputs(payload, run_id)
     behaviour.validate_inputs(resolved, _inputs_cfg, _behaviour_cfg)
 
+    # Load regulatory checklist if domain+market are available
+    regulatory_checklist = _load_regulatory_checklist(resolved)
+    if regulatory_checklist:
+        resolved["regulatory_checklist"] = regulatory_checklist
+
     user_message = input_builder.build_user_message(resolved)
     logger.info(
-        "AD-04 calling LLM: run_id=%s requirements=%d",
+        "PL-01 calling LLM: run_id=%s requirements=%d",
         run_id, len(resolved.get("structured_requirements") or []),
     )
 
@@ -124,14 +130,14 @@ async def _resolve_git_inputs(
         # Skip if already provided (e.g. from shared folder)
         if resolved.get(field_name):
             logger.info(
-                "AD-04 skipping git read: field=%s (already in payload)",
+                "PL-01 skipping git read: field=%s (already in payload)",
                 field_name,
             )
             continue
         git_path = git_path_template.format(run_id=run_id)
         json_field = spec.get("json_field", field_name)
         logger.info(
-            "AD-04 reading git input: field=%s path=%s reader=%s",
+            "PL-01 reading git input: field=%s path=%s reader=%s",
             field_name, git_path, type(_git_reader).__name__,
         )
         content = await _git_reader.read_json(git_path)
@@ -144,6 +150,60 @@ async def _resolve_git_inputs(
             )
         resolved[field_name] = content.get(json_field)
     return resolved
+
+
+def _load_regulatory_checklist(
+    payload: Dict[str, Any],
+) -> list | None:
+    """Load regulatory checklist based on project_context.domain + market.
+
+    Returns the checklist array if a matching file exists, else None.
+    The skill skips gracefully if domain/market are absent or no file found.
+    """
+    skills_cfg = _agent_cfg.get("skills", {}).get("regulatory_gap_detection", {})
+    if not skills_cfg.get("enabled"):
+        return None
+
+    project_context = payload.get("project_context") or {}
+    domain = project_context.get("domain", "").strip().lower()
+    market = project_context.get("market", "").strip().lower()
+
+    if not domain or not market:
+        logger.info(
+            "PL-01 regulatory_gap_detection: skipping — domain=%r market=%r",
+            domain, market,
+        )
+        return None
+
+    checklist_dir = Path(_config.project_root()) / skills_cfg.get(
+        "checklist_dir", "skills/regulatory"
+    )
+    checklist_file = checklist_dir / f"{domain}_{market}.json"
+
+    if not checklist_file.is_file():
+        logger.info(
+            "PL-01 regulatory_gap_detection: no checklist at %s — skipping",
+            checklist_file,
+        )
+        return None
+
+    try:
+        data = json.loads(checklist_file.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            logger.warning(
+                "PL-01 regulatory_gap_detection: checklist is not a list — skipping"
+            )
+            return None
+        logger.info(
+            "PL-01 regulatory_gap_detection: loaded %d clauses from %s",
+            len(data), checklist_file.name,
+        )
+        return data
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning(
+            "PL-01 regulatory_gap_detection: failed to load checklist: %s", exc
+        )
+        return None
 
 
 register(agent_id=AGENT_ID, handler=run, config=_config)

@@ -199,4 +199,4 @@ def bootstrap() -> None:
     so callers can be sure the registry is fully populated before they read
     it.
     """
-    from agents.ad04_gap_detection import agent as ad04  # noqa: F401
+    from agents.pl01_gap_detection import agent as pl01  # noqa: F401
