@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ agent_id }} - Data Design Report ({{ run_id }})</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "default",
+            securityLevel: "loose",
+            maxTextSize: 500000,
+            fontSize: 16,
+            flowchart: {
+                diagramPadding: 16,
+                nodeSpacing: 70,
+                rankSpacing: 100,
+                curve: "basis",
+                htmlLabels: true,
+                useMaxWidth: false
+            },
+            er: {
+                diagramPadding: 16,
+                useMaxWidth: false,
+                minEntityWidth: 130,
+                minEntityHeight: 80,
+                entityPadding: 16,
+                fontSize: 14
+            }
+        });
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            color: #1a1a1a;
+            line-height: 1.55;
+        }
+        h1 { color: #1a365d; border-bottom: 3px solid #2b6cb0; padding-bottom: 0.5rem; }
+        h2 { color: #2d3748; margin-top: 2.2rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; }
+        h3 { color: #4a5568; margin-top: 1.5rem; }
+        .meta { color: #718096; font-size: 0.9rem; margin-bottom: 2rem; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .summary-card {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .summary-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2b6cb0;
+            word-break: break-word;
+        }
+        .summary-card .label { font-size: 0.85rem; color: #718096; }
+        .conf-high { background: #c6f6d5; color: #276749; }
+        .conf-medium { background: #fefcbf; color: #975a16; }
+        .conf-low { background: #fed7d7; color: #c53030; }
+        .pill {
+            display: inline-block;
+            padding: 0.15rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .cat {
+            background: #e6fffa;
+            color: #234e52;
+            border: 1px solid #b2f5ea;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.6rem 0 1.5rem;
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 0.55rem 0.7rem;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #edf2f7; font-weight: 600; }
+        tr:nth-child(even) td { background: #fafafa; }
+        .diagram-wrap {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0 2rem;
+            overflow-x: auto;        /* horizontal scroll for wide graphs */
+            overflow-y: hidden;
+        }
+        .diagram-wrap .mermaid { min-width: 800px; }
+        .diagram-wrap .mermaid svg { font-size: 16px !important; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            font-size: 0.82rem;
+            margin: 0.5rem 0 1rem;
+        }
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .legend-swatch {
+            width: 14px; height: 14px;
+            border-radius: 3px;
+            border: 1px solid #888;
+            display: inline-block;
+        }
+        .req-refs { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; color: #4a5568; }
+        details summary {
+            cursor: pointer;
+            font-weight: 600;
+            padding: 0.35rem 0;
+        }
+        .rationale { color: #4a5568; font-size: 0.88rem; max-width: 60ch; }
+        .empty { color: #a0aec0; font-style: italic; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <h1>{{ agent_id }} - Data Design Report</h1>
+    <div class="meta">
+        Run ID: <strong>{{ run_id }}</strong>
+        &middot; Entities: <strong>{{ data_model | length }}</strong>
+        &middot; Secondary stores: <strong>{{ (storage_selection.secondary_stores or []) | length }}</strong>
+    </div>
+
+    {# ---------------- Summary cards ---------------- #}
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="value">{{ data_model | length }}</div>
+            <div class="label">Entities</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ (storage_selection.primary_store or {}).technology or "-" }}</div>
+            <div class="label">Primary store</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ (storage_selection.secondary_stores or []) | length }}</div>
+            <div class="label">Secondary stores</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ data_model | selectattr("relationships") | list | length }}</div>
+            <div class="label">Entities w/ relationships</div>
+        </div>
+    </div>
+
+    {# ---------------- Entity-relationship diagram (flowchart for readability) ---------------- #}
+    <h2>Entity Map</h2>
+    <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:#fef5e7"></span>core_business</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#e6fffa"></span>transactional</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#edf2f7"></span>reference_lookup</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#fff5f5"></span>audit_history</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#faf5ff"></span>configuration</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#e0f2fe"></span>derived_analytical</span>
+    </div>
+    {% if data_model %}
+    <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart LR
+{% for entity in data_model %}
+    {%- set node_id = entity.entity_id | replace("-", "_") %}
+    {%- set name = entity.entity_name or entity.entity_id %}
+    {%- set cat = entity.category or "uncat" %}
+    {{ node_id }}["<b>{{ entity.entity_id }}</b><br/>{{ name }}<br/><i style='font-size:11px;color:#555'>{{ cat }}</i>"]:::{{ cat }}
+{% endfor %}
+{% for entity in data_model %}{% for rel in (entity.relationships or []) %}
+    {%- set src = entity.entity_id | replace("-", "_") %}
+    {%- set dst_raw = (rel.entity or rel.target_entity_id or "Unknown") %}
+    {%- set dst = dst_raw | replace("-", "_") %}
+    {%- set t = rel.type or "one_to_many" %}
+    {%- if t == "one_to_one" %}{% set marker = "1..1" %}
+    {%- elif t == "one_to_many" %}{% set marker = "1..*" %}
+    {%- elif t == "many_to_one" %}{% set marker = "*..1" %}
+    {%- elif t == "many_to_many" %}{% set marker = "*..*" %}
+    {%- else %}{% set marker = t %}{% endif %}
+    {{ src }} -- "{{ marker }}" --> {{ dst }}
+{% endfor %}{% endfor %}
+    classDef core_business fill:#fef5e7,stroke:#b7791f,color:#744210,stroke-width:1.5px;
+    classDef transactional fill:#e6fffa,stroke:#319795,color:#234e52,stroke-width:1.5px;
+    classDef reference_lookup fill:#edf2f7,stroke:#718096,color:#2d3748,stroke-width:1.5px;
+    classDef audit_history fill:#fff5f5,stroke:#c53030,color:#742a2a,stroke-width:1.5px;
+    classDef configuration fill:#faf5ff,stroke:#805ad5,color:#44337a,stroke-width:1.5px;
+    classDef derived_analytical fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:1.5px;
+    classDef uncat fill:#f7fafc,stroke:#a0aec0,color:#4a5568,stroke-width:1px;
+    </div>
+    </div>
+    <p class="meta" style="margin-top:-0.5rem">Cardinality on edges: <code>1..1</code>, <code>1..*</code>, <code>*..1</code>, <code>*..*</code>. Scroll horizontally if the graph is wide.</p>
+    {% else %}
+    <p class="empty">No entities to diagram.</p>
+    {% endif %}
+
+    {# ---------------- Entity details ---------------- #}
+    <h2>Entities</h2>
+    {% if data_model %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Confidence</th>
+                <th>Attributes</th>
+                <th>Relationships</th>
+                <th>REQ refs</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entity in data_model %}
+            <tr>
+                <td><code>{{ entity.entity_id }}</code></td>
+                <td><strong>{{ entity.entity_name or "-" }}</strong></td>
+                <td>{% if entity.category %}<span class="pill cat">{{ entity.category }}</span>{% else %}-{% endif %}</td>
+                <td>
+                    {%- if entity.confidence -%}
+                    <span class="pill conf-{{ entity.confidence }}">{{ entity.confidence }}</span>
+                    {%- else -%}-{%- endif -%}
+                </td>
+                <td>{{ (entity.attributes or []) | length }}</td>
+                <td>{{ (entity.relationships or []) | length }}</td>
+                <td class="req-refs">{{ (entity.req_id_refs or []) | join(", ") or "-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {# ---------------- Per-entity attribute breakdown ---------------- #}
+    <h3>Entity Attribute Breakdown</h3>
+    {% for entity in data_model %}
+    <details>
+        <summary>
+            <code>{{ entity.entity_id }}</code> &mdash; {{ entity.entity_name or "-" }}
+            {% if entity.category %} <span class="pill cat">{{ entity.category }}</span>{% endif %}
+        </summary>
+        <p>{{ entity.description or "" }}</p>
+        {% if entity.attributes %}
+        <table>
+            <thead>
+                <tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                {% for attr in entity.attributes %}
+                <tr>
+                    <td><code>{{ attr.name }}</code></td>
+                    <td>{{ attr.type }}</td>
+                    <td>{{ "yes" if attr.required else "no" }}</td>
+                    <td>{{ attr.description or "" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty">No attributes declared.</p>
+        {% endif %}
+
+        {% if entity.relationships %}
+        <table>
+            <thead>
+                <tr><th>Target entity</th><th>Type</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                {% for rel in entity.relationships %}
+                <tr>
+                    <td><code>{{ rel.entity or rel.target_entity_id }}</code></td>
+                    <td><span class="pill cat">{{ rel.type }}</span></td>
+                    <td>{{ rel.description or "" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </details>
+    {% endfor %}
+    {% else %}
+    <p class="empty">No entities in this run.</p>
+    {% endif %}
+
+    {# ---------------- Storage selection ---------------- #}
+    <h2>Storage Selection</h2>
+    {% if storage_selection.primary_store %}
+    <h3>Primary Store</h3>
+    <table>
+        <thead>
+            <tr><th>Technology</th><th>Storage class</th><th>Confidence</th><th>Data types</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>{{ storage_selection.primary_store.technology }}</strong></td>
+                <td>{{ storage_selection.primary_store.storage_class or "-" }}</td>
+                <td>
+                    {%- if storage_selection.primary_store.confidence -%}
+                    <span class="pill conf-{{ storage_selection.primary_store.confidence }}">{{ storage_selection.primary_store.confidence }}</span>
+                    {%- else -%}-{%- endif -%}
+                </td>
+                <td>{{ (storage_selection.primary_store.data_types or []) | join(", ") or "-" }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="rationale"><strong>Rationale:</strong> {{ storage_selection.primary_store.rationale }}</p>
+    {% endif %}
+
+    {% if storage_selection.secondary_stores %}
+    <h3>Secondary Stores</h3>
+    <table>
+        <thead>
+            <tr><th>Technology</th><th>Storage class</th><th>Confidence</th><th>Purpose</th><th>Rationale</th></tr>
+        </thead>
+        <tbody>
+            {% for store in storage_selection.secondary_stores %}
+            <tr>
+                <td><strong>{{ store.technology }}</strong></td>
+                <td>{{ store.storage_class or "-" }}</td>
+                <td>
+                    {%- if store.confidence -%}
+                    <span class="pill conf-{{ store.confidence }}">{{ store.confidence }}</span>
+                    {%- else -%}-{%- endif -%}
+                </td>
+                <td>{{ store.purpose }}</td>
+                <td class="rationale">{{ store.rationale }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if storage_selection.overall_strategy %}
+    <h3>Overall Strategy</h3>
+    <p>{{ storage_selection.overall_strategy }}</p>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,72 @@
+{
+  "structured_requirements": [
+    {
+      "req_id": "REQ-001",
+      "title": "Candidate registration",
+      "description": "Candidates must be able to register with email and password and verify ownership via an email confirmation link.",
+      "type": "functional",
+      "priority": "high",
+      "acceptance_criterion": "New candidate completes registration in under 90 seconds; verification email sent within 30 seconds.",
+      "source_ref": "section_2_candidate_workflow"
+    },
+    {
+      "req_id": "REQ-002",
+      "title": "Resume upload",
+      "description": "Candidates can upload a resume document (PDF or DOCX, up to 5 MB) during application submission.",
+      "type": "functional",
+      "priority": "high",
+      "acceptance_criterion": "Upload accepted for PDF/DOCX up to 5MB; stored with checksum and metadata.",
+      "source_ref": "section_2_candidate_workflow"
+    },
+    {
+      "req_id": "REQ-003",
+      "title": "Recruiter application dashboard",
+      "description": "Recruiters can view all submitted applications for their open roles, filter by role, and download resumes.",
+      "type": "functional",
+      "priority": "high",
+      "acceptance_criterion": "Dashboard loads within 2 seconds for up to 500 applications; filter and download work end-to-end.",
+      "source_ref": "section_3_recruiter_workflow"
+    },
+    {
+      "req_id": "REQ-004",
+      "title": "AI-based role matching",
+      "description": "The platform must use machine learning to match candidate resumes to suitable open roles based on skills and experience. Match scores must be retrievable per candidate.",
+      "type": "functional",
+      "priority": "medium",
+      "acceptance_criterion": "Top-5 matched roles surfaced per candidate; match relevance precision > 70% on a labelled validation set.",
+      "source_ref": "section_4_ai_matching"
+    },
+    {
+      "req_id": "REQ-005",
+      "title": "Audit logging of recruiter actions",
+      "description": "Every recruiter action (view, download, status change) on a candidate record must be persisted as an immutable audit event.",
+      "type": "non_functional",
+      "subtype": "compliance",
+      "priority": "high",
+      "acceptance_criterion": "100% of recruiter mutating actions emit an audit event with actor, target, action, timestamp; events are append-only.",
+      "source_ref": "section_5_compliance"
+    },
+    {
+      "req_id": "REQ-006",
+      "title": "GDPR data handling",
+      "description": "All candidate PII must be stored encrypted at rest, deletable on request within 30 days, and exportable on subject access request.",
+      "type": "non_functional",
+      "subtype": "compliance",
+      "priority": "high",
+      "acceptance_criterion": "Erasure workflow removes PII within 30 days end-to-end; export produces a machine-readable archive within 7 days.",
+      "source_ref": "section_5_compliance"
+    }
+  ],
+  "project_context": {
+    "squad": "talent-platform",
+    "domain": "recruitment",
+    "project_name": "ai-job-portal"
+  },
+  "business_case": "Build an AI-focused job portal that connects candidates with machine learning and data science roles. Strategic goals: (1) reduce manual recruiter effort by 60%, (2) onboard 500+ registered candidates in Q1, (3) GDPR-compliant candidate data handling end-to-end, and (4) full audit logging of every recruiter action for traceability.",
+  "constraints": {
+    "api_style": "REST",
+    "auth": "JWT bearer + OAuth2",
+    "versioning": "URL prefix /v1",
+    "data_residency": "EU"
+  }
+}

@@ -63,18 +63,48 @@ def resolve_output_folder(
     return folder
 
 
-def list_input_files(folder: Path) -> List[Path]:
-    """List all supported files in the input folder (non-recursive)."""
+def list_input_files(folder: Path, allowed_extensions: Optional[List[str]] = None) -> List[Path]:
+    """List all supported files in the input folder (non-recursive).
+
+    Skips Office lock files (``~$foo.docx``), dotfiles, and other hidden
+    OS artefacts. Word creates ``~$<name>`` lock files whenever a docx is
+    open in the desktop app, and those would otherwise be picked up by
+    extension and explode in the parsers.
+    
+    Args:
+        folder: Directory to scan
+        allowed_extensions: Optional list of extensions to filter (e.g., [".json"])
+                          If None, all supported extensions are allowed.
+    """
+    extensions_to_use = set(allowed_extensions) if allowed_extensions else _SUPPORTED_EXTENSIONS
     files = []
     for f in sorted(folder.iterdir()):
-        if f.is_file() and f.suffix.lower() in _SUPPORTED_EXTENSIONS:
-            files.append(f)
+        if not f.is_file():
+            continue
+        if f.suffix.lower() not in extensions_to_use:
+            continue
+        if _is_hidden_or_lockfile(f):
+            logger.info("Shared folder skip: %s (hidden/lockfile)", f.name)
+            continue
+        files.append(f)
     if not files:
         raise ValueError(
             f"No supported input files found in {folder}. "
-            f"Supported extensions: {sorted(_SUPPORTED_EXTENSIONS)}"
+            f"Supported extensions: {sorted(extensions_to_use)}"
         )
     return files
+
+
+def _is_hidden_or_lockfile(path: Path) -> bool:
+    """True for Office lock files, dotfiles, and OS temp artefacts."""
+    name = path.name
+    if name.startswith("~$"):       # MS Office lock file (Word/Excel/PowerPoint)
+        return True
+    if name.startswith("."):         # dotfile (e.g. .DS_Store)
+        return True
+    if name.startswith("~"):         # legacy Office temp
+        return True
+    return False
 
 
 async def read_inputs(
@@ -85,6 +115,7 @@ async def read_inputs(
     agent_id: str,
     llm_client: Any = None,
     llm_config: Optional[Dict[str, Any]] = None,
+    allowed_extensions: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Read and merge all input files from the shared folder into a payload.
 
@@ -94,9 +125,12 @@ async def read_inputs(
 
     Multiple files are merged into a single dict (last writer wins for
     overlapping keys).
+    
+    Args:
+        allowed_extensions: Optional list of extensions to filter (e.g., [".json"])
     """
     folder = resolve_input_folder(base_path, thread_id, input_subfolder)
-    files = list_input_files(folder)
+    files = list_input_files(folder, allowed_extensions=allowed_extensions)
 
     logger.info(
         "Shared folder read: agent=%s thread=%s folder=%s files=%d",
@@ -141,15 +175,22 @@ def write_output(
     agent_id: str,
     result: Dict[str, Any],
     output_format: str = "json",
+    output_filename: Optional[str] = None,
 ) -> Path:
     """Write the agent result to the output folder.
+
+    ``output_filename`` (without extension) overrides the default
+    ``{agent_id}_output`` stem. Used so callers can publish stable,
+    human-readable filenames like ``data_model_design.json`` in the
+    shared folder. The extension is appended based on ``output_format``.
 
     Returns the path of the written file.
     """
     folder = resolve_output_folder(base_path, thread_id, output_subfolder)
+    stem = (output_filename or f"{agent_id}_output").strip() or f"{agent_id}_output"
 
     if output_format == "json":
-        out_path = folder / f"{agent_id}_output.json"
+        out_path = folder / f"{stem}.json"
         out_path.write_text(
             json.dumps(result, indent=2, ensure_ascii=False),
             encoding="utf-8",
@@ -160,7 +201,7 @@ def write_output(
         rendered = render_output(
             result, output_format, agent_id=agent_id, run_id=thread_id
         )
-        out_path = folder / rendered.filename
+        out_path = folder / f"{stem}.{output_format}"
         out_path.write_bytes(rendered.content)
 
     logger.info("Output written: %s", out_path)

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Job Portal - Agent Network Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 30px;
+        }
+        
+        h1 {
+            color: #4B0082;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .legend {
+            background: #f8f9fa;
+            border: 2px solid #9370DB;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .legend h3 {
+            color: #4B0082;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .legend-color {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            margin-right: 12px;
+            border: 2px solid #333;
+        }
+        
+        .orchestrator-color {
+            background: #9370DB;
+        }
+        
+        .super-agent-color {
+            background: #BA55D3;
+        }
+        
+        .utility-agent-color {
+            background: #DDA0DD;
+        }
+        
+        .tool-color {
+            background: #E6E6FA;
+        }
+        
+        .legend-label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .legend-description {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 3px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        
+        .stat-number {
+            font-size: 3em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+        
+        .diagram-container {
+            background: white;
+            border: 2px solid #9370DB;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+        
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            margin: 0 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .footer {
+            text-align: center;
+            color: #666;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        @media print {
+            body {
+                background: white;
+            }
+            .container {
+                box-shadow: none;
+            }
+            .controls {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI Job Portal</h1>
+        <div class="subtitle">Agent Network Architecture</div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">1</div>
+                <div class="stat-label">Orchestrator</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">6</div>
+                <div class="stat-label">Super Agents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">18</div>
+                <div class="stat-label">Utility Agents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">36</div>
+                <div class="stat-label">Tools</div>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <h3>📋 Legend</h3>
+            <div class="legend-grid">
+                <div class="legend-item">
+                    <div class="legend-color orchestrator-color"></div>
+                    <div>
+                        <div class="legend-label">Orchestrator Agent</div>
+                        <div class="legend-description">Central coordinator</div>
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color super-agent-color"></div>
+                    <div>
+                        <div class="legend-label">Super Agent</div>
+                        <div class="legend-description">Domain coordinator</div>
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color utility-agent-color"></div>
+                    <div>
+                        <div class="legend-label">Utility Agent</div>
+                        <div class="legend-description">Specialized task executor</div>
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color tool-color"></div>
+                    <div>
+                        <div class="legend-label">Tool</div>
+                        <div class="legend-description">Function/API</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="diagram-container">
+            <div class="mermaid">
+flowchart LR
+    subgraph Orchestrator
+        O[AIJobPortalOrchestrator]
+    end
+    
+    subgraph SuperAgents[Super Agents]
+        SA1[AuthenticationSuperAgent]
+        SA2[ResumeManagementSuperAgent]
+        SA3[JobPositionSuperAgent]
+        SA4[ApplicationSubmissionSuperAgent]
+        SA5[RecruiterDashboardSuperAgent]
+        SA6[DataRepositorySuperAgent]
+    end
+    
+    subgraph UtilityAgents[Utility Agents]
+        UA1["UserRegistrationAgent<br/>(uses: register_user, validate_password_complexity)"]
+        UA2["UserLoginAgent<br/>(uses: authenticate_user, generate_session_token, track_failed_logins)"]
+        UA3["RoleAssignmentAgent<br/>(uses: assign_user_role, verify_user_role)"]
+        UA4["ResumeValidationAgent<br/>(uses: validate_resume_format, validate_resume_size, scan_resume_for_malware)"]
+        UA5["ResumeStorageAgent<br/>(uses: store_resume, archive_old_resumes)"]
+        UA6["ResumeFeedbackAgent<br/>(uses: generate_upload_progress, generate_resume_preview_link, send_resume_upload_feedback)"]
+        UA7["JobListRetrievalAgent<br/>(uses: get_ai_job_positions)"]
+        UA8["JobDescriptionAgent<br/>(uses: get_job_description)"]
+        UA9["JobSelectionValidationAgent<br/>(uses: validate_job_selection)"]
+        UA10["ApplicationValidationAgent<br/>(uses: validate_application_completeness)"]
+        UA11["ApplicationSubmissionAgent<br/>(uses: submit_application, generate_reference_number)"]
+        UA12["ConfirmationAgent<br/>(uses: send_confirmation_message)"]
+        UA13["ApplicationAggregationAgent<br/>(uses: aggregate_applications)"]
+        UA14["ApplicationDisplayAgent<br/>(uses: format_application_display)"]
+        UA15["ResumeDownloadAgent<br/>(uses: generate_resume_download_link, enforce_download_rate_limit)"]
+        UA16["DataStorageAgent<br/>(uses: store_user_profile, store_resume_file, store_application_record, backup_data)"]
+        UA17["DataRetrievalAgent<br/>(uses: retrieve_application_data, retrieve_resume_file, fetch_from_cache)"]
+        UA18["DataIntegrityAgent<br/>(uses: validate_data_integrity, log_user_action, delete_user_data)"]
+    end
+    
+    subgraph Tools
+        T1[register_user]
+        T2[validate_password_complexity]
+        T3[authenticate_user]
+        T4[generate_session_token]
+        T5[track_failed_logins]
+        T6[assign_user_role]
+        T7[verify_user_role]
+        T8[validate_resume_format]
+        T9[validate_resume_size]
+        T10[scan_resume_for_malware]
+        T11[store_resume]
+        T12[archive_old_resumes]
+        T13[generate_upload_progress]
+        T14[generate_resume_preview_link]
+        T15[send_resume_upload_feedback]
+        T16[get_ai_job_positions]
+        T17[get_job_description]
+        T18[validate_job_selection]
+        T19[validate_application_completeness]
+        T20[submit_application]
+        T21[generate_reference_number]
+        T22[send_confirmation_message]
+        T23[aggregate_applications]
+        T24[format_application_display]
+        T25[generate_resume_download_link]
+        T26[enforce_download_rate_limit]
+        T27[store_user_profile]
+        T28[store_resume_file]
+        T29[store_application_record]
+        T30[backup_data]
+        T31[retrieve_application_data]
+        T32[retrieve_resume_file]
+        T33[fetch_from_cache]
+        T34[validate_data_integrity]
+        T35[log_user_action]
+        T36[delete_user_data]
+    end
+    
+    O --> SA1
+    O --> SA2
+    O --> SA3
+    O --> SA4
+    O --> SA5
+    O --> SA6
+    
+    SA1 --> UA1
+    SA1 --> UA2
+    SA1 --> UA3
+    
+    SA2 --> UA4
+    SA2 --> UA5
+    SA2 --> UA6
+    
+    SA3 --> UA7
+    SA3 --> UA8
+    SA3 --> UA9
+    
+    SA4 --> UA10
+    SA4 --> UA11
+    SA4 --> UA12
+    
+    SA5 --> UA13
+    SA5 --> UA14
+    SA5 --> UA15
+    
+    SA6 --> UA16
+    SA6 --> UA17
+    SA6 --> UA18
+    
+    UA1 --> T1
+    UA1 --> T2
+    UA2 --> T3
+    UA2 --> T4
+    UA2 --> T5
+    UA3 --> T6
+    UA3 --> T7
+    UA4 --> T8
+    UA4 --> T9
+    UA4 --> T10
+    UA5 --> T11
+    UA5 --> T12
+    UA6 --> T13
+    UA6 --> T14
+    UA6 --> T15
+    UA7 --> T16
+    UA8 --> T17
+    UA9 --> T18
+    UA10 --> T19
+    UA11 --> T20
+    UA11 --> T21
+    UA12 --> T22
+    UA13 --> T23
+    UA14 --> T24
+    UA15 --> T25
+    UA15 --> T26
+    UA16 --> T27
+    UA16 --> T28
+    UA16 --> T29
+    UA16 --> T30
+    UA17 --> T31
+    UA17 --> T32
+    UA17 --> T33
+    UA18 --> T34
+    UA18 --> T35
+    UA18 --> T36
+    
+    classDef orchestrator fill:#9370DB,stroke:#4B0082,stroke-width:3px,color:#fff
+    classDef superAgent fill:#BA55D3,stroke:#8B008B,stroke-width:2px,color:#fff
+    classDef utilityAgent fill:#DDA0DD,stroke:#9370DB,stroke-width:2px,color:#000
+    classDef tool fill:#E6E6FA,stroke:#9370DB,stroke-width:1px,color:#000
+    
+    class O orchestrator
+    class SA1,SA2,SA3,SA4,SA5,SA6 superAgent
+    class UA1,UA2,UA3,UA4,UA5,UA6,UA7,UA8,UA9,UA10,UA11,UA12,UA13,UA14,UA15,UA16,UA17,UA18 utilityAgent
+    class T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15,T16,T17,T18,T19,T20,T21,T22,T23,T24,T25,T26,T27,T28,T29,T30,T31,T32,T33,T34,T35,T36 tool
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn" onclick="window.print()">🖨️ Print Diagram</button>
+            <button class="btn" onclick="zoomIn()">🔍 Zoom In</button>
+            <button class="btn" onclick="zoomOut()">🔎 Zoom Out</button>
+            <button class="btn" onclick="resetZoom()">↻ Reset View</button>
+        </div>
+        
+        <div class="footer">
+            <p><strong>AI Job Portal Agent Network</strong></p>
+            <p>Generated on: May 11, 2026 | Session: e7262def-e1b5-49ea-8229-a486b81b89d5</p>
+        </div>
+    </div>
+    
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+        
+        let currentZoom = 1;
+        
+        function zoomIn() {
+            currentZoom += 0.1;
+            document.querySelector('.mermaid').style.transform = `scale(${currentZoom})`;
+        }
+        
+        function zoomOut() {
+            if (currentZoom > 0.5) {
+                currentZoom -= 0.1;
+                document.querySelector('.mermaid').style.transform = `scale(${currentZoom})`;
+            }
+        }
+        
+        function resetZoom() {
+            currentZoom = 1;
+            document.querySelector('.mermaid').style.transform = `scale(1)`;
+        }
+    </script>
+</body>
+</html>
