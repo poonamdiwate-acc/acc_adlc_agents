@@ -97,8 +97,18 @@ class ADLCConfig:
         return self._require_agent(agent_id).get("git_reader", {}) or {}
 
     def shared_folder_config(self) -> Dict[str, Any]:
-        """System-wide ``shared_folder`` block from tech stack config."""
-        return self._tech.get("shared_folder", {}) or {}
+        """System-wide ``shared_folder`` block from tech stack config.
+
+        The ``base_path`` can be overridden by the ``SHARED_FOLDER_PATH``
+        environment variable (useful for Docker where the mount point
+        differs from the host path).
+        """
+        cfg = dict(self._tech.get("shared_folder", {}) or {})
+        import os
+        env_path = os.environ.get("SHARED_FOLDER_PATH")
+        if env_path:
+            cfg["base_path"] = env_path
+        return cfg
 
     def shared_io_config(self, agent_id: str) -> Dict[str, Any]:
         """Per-agent ``shared_io`` block (input_subfolder, output_subfolder)."""

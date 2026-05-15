@@ -1,0 +1,28 @@
+services:
+  adlc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adlc-agent-service
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - LOG_LEVEL=INFO
+      - SHARED_FOLDER_PATH=/shared
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/vertex-sa.json
+    volumes:
+      # Mount shared folder — container reads/writes here
+      - C:\SharedFolderAdlc:/shared
+      # Mount GCP service account credentials
+      - ./secrets/vertex-sa.json:/app/secrets/vertex-sa.json:ro
+    # Override the credentials path to match the container mount
+    command: ["--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
