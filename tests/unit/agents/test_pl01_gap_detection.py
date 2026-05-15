@@ -1,4 +1,4 @@
-"""Unit tests for AD-04 — Gap Detection Agent.
+"""Unit tests for PL-01 — Gap Detection Agent.
 
 The LLM client and the git reader are both mocked so these run without
 network access. Behaviour and output_parser are exercised directly with
@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agents.ad04_gap_detection import behaviour, output_parser
+from agents.pl01_gap_detection import behaviour, output_parser
 from core.exceptions import OutputParseError, PipelineStopError
 
 

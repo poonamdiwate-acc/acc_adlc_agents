@@ -123,7 +123,7 @@ def _skill_tags(agent_block: Dict[str, Any]) -> List[str]:
 # Canned examples per agent. Sourced from each agent's SKILL.md test
 # cases. Moved into the builder so callers don't have to parse SKILL.md.
 _EXAMPLES_BY_AGENT: Dict[str, List[str]] = {
-    "AD-04": [
+    "PL-01": [
         "Identify gaps in a list of structured requirements against a business case and scope boundaries.",
         "Flag non-functional requirements that lack measurable thresholds (e.g. 'system must be fast' without metrics).",
         "Detect business goals like 'audit logging for SOC2 compliance' that are stated in the business case but not covered by any REQ.",

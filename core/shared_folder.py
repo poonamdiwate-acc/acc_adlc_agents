@@ -17,7 +17,7 @@ Directory layout::
         │   ├── requirements.pdf
         │   └── scope.json
         └── {output_subfolder}/     ← agent writes result here
-            └── AD-04_output.json
+            └── PL-01_output.json
 """
 
 from __future__ import annotations

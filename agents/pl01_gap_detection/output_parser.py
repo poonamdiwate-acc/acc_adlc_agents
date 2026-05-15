@@ -40,6 +40,7 @@ class _GapItem(BaseModel):
     severity: str = Field(min_length=1)
     description: str = Field(min_length=1)
     recommendation: str = Field(min_length=1)
+    regulation_ref: str | None = None
     auto_resolvable: bool = False
 
 

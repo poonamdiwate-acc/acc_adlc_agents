@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADLC — Agent Config Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal:     #1D9E75; --teal-bg:  #E1F5EE; --teal-dim: #9FE1CB;
+    --blue:     #1a56a0; --blue-bg:  #EBF3FC; --blue-dim: #93C4EE;
+    --purple:   #7F77DD; --purple-bg:#EEEDFE; --purple-dim:#CECBF6;
+    --amber:    #BA7517; --amber-bg: #FAEEDA;
+    --coral:    #C0534A; --coral-bg: #FAEAEA;
+    --git:      #24292e; --git-bg:   #f6f8fa; --git-green:#2da44e;
+    --g8:#1a1a1a; --g6:#555; --g4:#999; --g2:#e5e5e3; --g1:#f5f5f3;
+    --white:#fff;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f0eeea;
+    color: var(--g8);
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+  .page { max-width: 860px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .hdr { margin-bottom: 32px; }
+  .hdr-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+  .hdr h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+  .hdr p  { font-size: 13px; color: var(--g6); margin-top: 4px; }
+  .version-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600;
+    padding: 4px 12px; border-radius: 20px;
+    background: var(--teal-bg); border: 1px solid var(--teal-dim);
+    color: var(--teal); white-space: nowrap;
+  }
+
+  /* ── Overview strip ── */
+  .overview {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 32px;
+  }
+  .ov-card {
+    background: var(--white); border-radius: 10px;
+    border: 1.5px solid var(--g2); padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .ov-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: white; flex-shrink: 0;
+  }
+  .ov-num.blue   { background: var(--blue); }
+  .ov-num.teal   { background: var(--teal); }
+  .ov-num.purple { background: var(--purple); }
+  .ov-title { font-size: 12px; font-weight: 600; color: var(--g8); margin-bottom: 2px; }
+  .ov-desc  { font-size: 11px; color: var(--g6); line-height: 1.4; }
+
+  /* ── Section ── */
+  .section { margin-bottom: 32px; }
+  .section-hdr {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+  }
+  .section-num {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: white; flex-shrink: 0;
+  }
+  .section-num.blue   { background: var(--blue); }
+  .section-num.teal   { background: var(--teal); }
+  .section-num.purple { background: var(--purple); }
+  .section-title { font-size: 16px; font-weight: 600; color: var(--g8); }
+  .section-sub   { font-size: 12px; color: var(--g4); font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Step cards ── */
+  .steps { display: flex; flex-direction: column; gap: 10px; }
+  .step-card {
+    background: var(--white); border-radius: 10px;
+    border: 1.5px solid var(--g2); overflow: hidden;
+  }
+  .step-hdr {
+    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--g2);
+  }
+  .step-hdr.blue   { background: var(--blue-bg);   border-bottom-color: var(--blue-dim); }
+  .step-hdr.teal   { background: var(--teal-bg);   border-bottom-color: var(--teal-dim); }
+  .step-hdr.purple { background: var(--purple-bg); border-bottom-color: var(--purple-dim); }
+  .step-hdr.amber  { background: var(--amber-bg);  border-bottom-color: #E8C87A; }
+  .step-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+  }
+  .step-badge.blue   { background: var(--blue);   color: white; }
+  .step-badge.teal   { background: var(--teal);   color: white; }
+  .step-badge.purple { background: var(--purple); color: white; }
+  .step-badge.amber  { background: var(--amber);  color: white; }
+  .step-name { font-size: 13px; font-weight: 600; color: var(--g8); }
+  .step-body { padding: 14px 16px; }
+  .step-desc { font-size: 12px; color: var(--g6); margin-bottom: 10px; line-height: 1.6; }
+
+  /* ── Code block ── */
+  .code-block {
+    background: var(--git); border-radius: 8px;
+    padding: 12px 16px; margin: 8px 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: #e0e0e0; line-height: 1.8; overflow-x: auto;
+  }
+  .code-block .cmd   { color: #79c0ff; }
+  .code-block .cmt   { color: #6a9955; }
+  .code-block .str   { color: #a5d6ff; }
+  .code-block .ok    { color: var(--git-green); font-weight: 700; }
+  .code-block .err   { color: #f97583; font-weight: 700; }
+  .code-block .warn  { color: #e3b341; }
+  .code-block .path  { color: #d2a8ff; }
+
+  /* ── Q&A cards for generator ── */
+  .qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .qa-card {
+    background: var(--g1); border: 1px solid var(--g2);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .qa-q {
+    font-size: 11px; font-weight: 600; color: var(--g8);
+    margin-bottom: 3px; display: flex; align-items: center; gap: 6px;
+  }
+  .qa-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+    background: var(--blue); color: white;
+    padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
+  }
+  .qa-a { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--blue); }
+
+  /* ── Validation result ── */
+  .val-result {
+    border-radius: 8px; padding: 12px 14px; margin-top: 8px;
+  }
+  .val-result.pass { background: #e6f4ea; border: 1px solid #c3e6cb; }
+  .val-result.fail { background: var(--coral-bg); border: 1px solid #E8A09B; }
+  .val-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+    margin-bottom: 5px;
+  }
+  .val-title.pass { color: var(--git-green); }
+  .val-title.fail { color: var(--coral); }
+  .val-row { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--g6); padding: 1px 0; }
+
+  /* ── Error table ── */
+  .error-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
+  .error-table th {
+    text-align: left; padding: 6px 10px;
+    background: var(--g1); color: var(--g4);
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    border-bottom: 1px solid var(--g2);
+  }
+  .error-table td { padding: 7px 10px; border-bottom: 1px solid var(--g2); color: var(--g6); }
+  .error-table td:first-child { font-family: 'JetBrains Mono', monospace; color: var(--coral); font-size: 10px; }
+  .error-table td:last-child { color: var(--teal); font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+
+  /* ── Files strip ── */
+  .files-strip {
+    background: var(--white); border: 1.5px solid var(--g2);
+    border-radius: 10px; padding: 14px 16px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 32px;
+  }
+  .file-card { display: flex; align-items: flex-start; gap: 8px; }
+  .file-icon {
+    font-size: 18px; flex-shrink: 0; margin-top: 1px;
+  }
+  .file-name {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-weight: 600; color: var(--g8); margin-bottom: 2px;
+  }
+  .file-desc { font-size: 10px; color: var(--g6); line-height: 1.4; }
+
+  /* ── Rules strip ── */
+  .rules { background: var(--amber-bg); border: 1.5px solid #E8C87A; border-radius: 10px; padding: 14px 16px; }
+  .rules-title { font-size: 12px; font-weight: 600; color: var(--amber); margin-bottom: 8px; }
+  .rule-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 11px; color: var(--g6); padding: 3px 0;
+  }
+  .rule-icon { color: var(--amber); flex-shrink: 0; font-weight: 700; }
+
+  /* ── Flow line ── */
+  .flow-line {
+    display: flex; flex-direction: column; align-items: center; padding: 6px 0;
+  }
+  .fl { width: 1.5px; height: 16px; background: var(--g2); }
+  .fh { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid var(--g2); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── HEADER ── -->
+  <div class="hdr">
+    <div class="hdr-top">
+      <div>
+        <h1>ADLC — Agent Config Guide</h1>
+        <p>How to generate, validate, and maintain agent config files</p>
+      </div>
+      <div class="version-badge">Schema v1.0.0</div>
+    </div>
+  </div>
+
+  <!-- ── OVERVIEW ── -->
+  <div class="overview">
+    <div class="ov-card">
+      <div class="ov-num blue">1</div>
+      <div>
+        <div class="ov-title">Generate</div>
+        <div class="ov-desc">Run the generator script. Answer 7 sections of questions. Config is created and validated automatically.</div>
+      </div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-num teal">2</div>
+      <div>
+        <div class="ov-title">Validate</div>
+        <div class="ov-desc">Run the validator on any config. Catches schema errors and cross-field mismatches before code is written.</div>
+      </div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-num purple">3</div>
+      <div>
+        <div class="ov-title">Place & proceed</div>
+        <div class="ov-desc">Move validated config to configs/ folder. Create the matching SKILL.md file. Start building.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PHASE PREFIX LEGEND ── -->
+  <div style="background:white;border:1.5px solid var(--g2);border-radius:10px;padding:12px 16px;margin-bottom:20px">
+    <div style="font-size:12px;font-weight:600;color:var(--g8);margin-bottom:10px">Agent ID prefix by phase</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+      <div style="text-align:center;background:var(--blue-bg);border:1px solid var(--blue-dim);border-radius:7px;padding:8px 6px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--blue)">PL</div>
+        <div style="font-size:10px;color:var(--g6);margin-top:2px">Plan</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g4)">PL-04</div>
+      </div>
+      <div style="text-align:center;background:var(--teal-bg);border:1px solid var(--teal-dim);border-radius:7px;padding:8px 6px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--teal)">DE</div>
+        <div style="font-size:10px;color:var(--g6);margin-top:2px">Design</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g4)">DE-08</div>
+      </div>
+      <div style="text-align:center;background:var(--purple-bg);border:1px solid var(--purple-dim);border-radius:7px;padding:8px 6px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--purple)">BU</div>
+        <div style="font-size:10px;color:var(--g6);margin-top:2px">Build</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g4)">BU-03</div>
+      </div>
+      <div style="text-align:center;background:var(--amber-bg);border:1px solid #E8C87A;border-radius:7px;padding:8px 6px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--amber)">VA</div>
+        <div style="font-size:10px;color:var(--g6);margin-top:2px">Validate</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g4)">VA-09</div>
+      </div>
+      <div style="text-align:center;background:var(--coral-bg);border:1px solid #E8A09B;border-radius:7px;padding:8px 6px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--coral)">OP</div>
+        <div style="font-size:10px;color:var(--g6);margin-top:2px">Operate</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g4)">OP-01</div>
+      </div>
+      <div style="text-align:center;background:var(--blue-bg);border:1px solid var(--blue-dim);border-radius:7px;padding:8px 6px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--blue)">GW</div>
+        <div style="font-size:10px;color:var(--g6);margin-top:2px">GenWiz</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g4)">GW-05</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FILES NEEDED ── -->
+  <div class="files-strip">
+    <div class="file-card">
+      <div class="file-icon">⚙️</div>
+      <div>
+        <div class="file-name">generate_agent_config.py</div>
+        <div class="file-desc">Interactive generator. Asks questions, creates config, runs validation automatically.</div>
+      </div>
+    </div>
+    <div class="file-card">
+      <div class="file-icon">🛡</div>
+      <div>
+        <div class="file-name">validate_config.py</div>
+        <div class="file-desc">Standalone validator. Run anytime on any config file. Use before every PR.</div>
+      </div>
+    </div>
+    <div class="file-card">
+      <div class="file-icon">📋</div>
+      <div>
+        <div class="file-name">AGENT_CONFIG_SCHEMA.json</div>
+        <div class="file-desc">JSON Schema definition. Both scripts use this. Keep in same folder as the scripts.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 1: SETUP ── -->
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-num blue">1</div>
+      <div>
+        <div class="section-title">Setup — one time only</div>
+        <div class="section-sub">install jsonschema · place files in ADLC root</div>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step-card">
+        <div class="step-hdr blue">
+          <span class="step-badge blue">INSTALL</span>
+          <span class="step-name">Install the jsonschema library</span>
+        </div>
+        <div class="step-body">
+          <div class="code-block">
+<span class="cmd">pip install jsonschema</span>
+          </div>
+          <div class="step-desc">Required by both generate_agent_config.py and validate_config.py. Only needed once per environment.</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr blue">
+          <span class="step-badge blue">PLACE FILES</span>
+          <span class="step-name">Place all three files in your ADLC root folder</span>
+        </div>
+        <div class="step-body">
+          <div class="code-block">
+<span class="path">ADLC/</span>
+├── <span class="str">generate_agent_config.py</span>     <span class="cmt">← generator</span>
+├── <span class="str">validate_config.py</span>           <span class="cmt">← validator</span>
+├── <span class="str">AGENT_CONFIG_SCHEMA.json</span>     <span class="cmt">← schema (both scripts read this)</span>
+├── configs/                     <span class="cmt">← generated configs go here</span>
+└── skills/                      <span class="cmt">← SKILL.md files go here</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── SECTION 2: GENERATE ── -->
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-num blue">2</div>
+      <div>
+        <div class="section-title">Generate a new agent config</div>
+        <div class="section-sub">python3 generate_agent_config.py</div>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step-card">
+        <div class="step-hdr blue">
+          <span class="step-badge blue">RUN</span>
+          <span class="step-name">Start the generator</span>
+        </div>
+        <div class="step-body">
+          <div class="code-block">
+<span class="cmt"># from your ADLC root folder</span>
+<span class="cmd">python3 generate_agent_config.py</span>
+
+<span class="ok">==================================================</span>
+<span class="ok">  ADLC Agent Config Generator  v1.0.0</span>
+<span class="ok">==================================================</span>
+Answer each question. Press Enter to accept defaults.
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr blue">
+          <span class="step-badge blue">QUESTIONS</span>
+          <span class="step-name">Answer 7 sections of questions</span>
+        </div>
+        <div class="step-body">
+          <div class="step-desc">The generator asks questions grouped into 7 sections. Defaults are shown in brackets — press Enter to accept.</div>
+          <div class="qa-grid">
+            <div class="qa-card">
+              <div class="qa-q"><span class="qa-num">1/7</span> Agent identity</div>
+              <div class="qa-a">ID, name, phase, endpoint, skill file</div>
+            </div>
+            <div class="qa-card">
+              <div class="qa-q"><span class="qa-num">2/7</span> LLM config</div>
+              <div class="qa-a">max_tokens, timeout_seconds</div>
+            </div>
+            <div class="qa-card">
+              <div class="qa-q"><span class="qa-num">3/7</span> Manifest</div>
+              <div class="qa-a">fields the agent reads + what it returns</div>
+            </div>
+            <div class="qa-card">
+              <div class="qa-q"><span class="qa-num">4/7</span> Inputs</div>
+              <div class="qa-a">required, type, on_fail per field</div>
+            </div>
+            <div class="qa-card">
+              <div class="qa-q"><span class="qa-num">5/7</span> Outputs</div>
+              <div class="qa-a">schema per output field (array or object)</div>
+            </div>
+            <div class="qa-card">
+              <div class="qa-q"><span class="qa-num">6/7</span> Supported formats</div>
+              <div class="qa-a">default output format (json/docx/pdf/html)</div>
+            </div>
+            <div class="qa-card">
+              <div class="qa-q"><span class="qa-num">7/7</span> Shared folder</div>
+              <div class="qa-a">input_subfolder, output_subfolder names</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr blue">
+          <span class="step-badge blue">OUTPUT</span>
+          <span class="step-name">Config is created and validated automatically</span>
+        </div>
+        <div class="step-body">
+          <div class="code-block">
+<span class="ok">==================================================</span>
+  <span class="ok">✓</span> Generated: <span class="path">configs/DE-09_Unit_Test_Generation_Config.json</span>
+  <span class="ok">✓</span> Validated against schema v1.1.0
+
+  Summary:
+    Agent ID:       DE-09
+    Name:           Unit Test Generation
+    Phase:          design
+    Endpoint:       /agents/unit-test-generation
+    Reads fields:   structured_requirements
+    Returns:        unit_tests, test_coverage_report
+    Input folder:   bs_docs
+    Output folder:  unit_test_generation_response
+    Skill file:     DE-09_Unit_Test_Generation_SKILL.md
+
+  Next step: create DE-09_Unit_Test_Generation_SKILL.md in skills/
+<span class="ok">==================================================</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── SECTION 2B: TEMPLATE ── -->
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-num blue">2B</div>
+      <div>
+        <div class="section-title">Alternative — fill the template manually</div>
+        <div class="section-sub">AGENT_CONFIG_TEMPLATE.json · for developers who prefer editing directly</div>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step-card">
+        <div class="step-hdr blue">
+          <span class="step-badge blue">COPY</span>
+          <span class="step-name">Step 1 — Copy the template and rename it</span>
+        </div>
+        <div class="step-body">
+          <div class="code-block">
+<span class="cmd">cp AGENT_CONFIG_TEMPLATE.json configs/DE-09_Unit_Test_Generation_Config.json</span>
+          </div>
+          <div class="step-desc" style="margin-top:8px">
+            Filename format: <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue)">AD-{step}_{Agent_Name}_Config.json</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr blue">
+          <span class="step-badge blue">FILL</span>
+          <span class="step-name">Step 2 — Replace every {{PLACEHOLDER}}</span>
+        </div>
+        <div class="step-body">
+          <div class="step-desc">Open the file and replace each placeholder. The table below shows every placeholder, what to fill, and an example.</div>
+          <table class="error-table" style="margin-top:10px">
+            <tr><th>Placeholder</th><th>What to fill</th><th>Example</th></tr>
+            <tr><td>{{STEP_NUMBER}}</td><td>Two-digit step number</td><td style="color:var(--teal)">09</td></tr>
+            <tr><td>{{AGENT_NAME}}</td><td>Title case agent name</td><td style="color:var(--teal)">Unit Test Generation</td></tr>
+            <tr><td>{{PHASE}}</td><td>plan | design | build | test | deploy</td><td style="color:var(--teal)">design</td></tr>
+            <tr><td>{{ENDPOINT_SLUG}}</td><td>Lowercase hyphenated</td><td style="color:var(--teal)">/agents/unit-test-generation</td></tr>
+            <tr><td>{{PHASE_PREFIX}}</td><td>Phase prefix — PL / DE / BU / VA / OP</td><td style="color:var(--teal)">DE</tr>
+            <tr>
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-num teal">3</div>
+      <div>
+        <div class="section-title">Validate any config file</div>
+        <div class="section-sub">python3 validate_config.py &lt;config_file&gt;</div>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step-card">
+        <div class="step-hdr teal">
+          <span class="step-badge teal">RUN</span>
+          <span class="step-name">Validate a single config file</span>
+        </div>
+        <div class="step-body">
+          <div class="code-block">
+<span class="cmd">python3 validate_config.py configs/DE-09_Unit_Test_Generation_Config.json</span>
+          </div>
+          <div class="val-result pass">
+            <div class="val-title pass">✓ Valid</div>
+            <div class="val-row">Agent:    DE-09 — Unit Test Generation</div>
+            <div class="val-row">Phase:    design</div>
+            <div class="val-row">Returns:  unit_tests, test_coverage_report</div>
+            <div class="val-row">Status:   draft</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr teal">
+          <span class="step-badge teal">VALIDATE ALL</span>
+          <span class="step-name">Validate all configs at once</span>
+        </div>
+        <div class="step-body">
+          <div class="code-block">
+<span class="cmt"># validate every config in the configs/ folder</span>
+<span class="cmd">for f in configs/*.json; do python3 validate_config.py "$f"; done</span>
+
+Validating: PL-04_Gap_Detection_Config.json     <span class="ok">✓ Valid</span>
+Validating: DE-08_Data_Design_Config.json        <span class="ok">✓ Valid</span>
+Validating: DE-09_Unit_Test_Generation_Config.json <span class="ok">✓ Valid</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr amber">
+          <span class="step-badge amber">ERRORS</span>
+          <span class="step-name">What errors look like — and how to fix them</span>
+        </div>
+        <div class="step-body">
+          <div class="val-result fail">
+            <div class="val-title fail">✗ Schema errors (2):</div>
+            <div class="val-row">  [agent → id] 'PL-04' does not match '^(AD|GW)-[0-9]{2}$'</div>
+            <div class="val-row">  [agent → phase] 'planning' is not one of ['plan','design','build','test','deploy']</div>
+          </div>
+          <table class="error-table" style="margin-top:12px">
+            <tr><th>Error</th><th>Cause</th><th>Fix</th></tr>
+            <tr>
+              <td>agent.id pattern mismatch</td>
+              <td>Using old PL-xx naming</td>
+              <td>Use phase prefix: PL / DE / BU / VA / OP / GW</td>
+            </tr>
+            <tr>
+              <td>phase not in enum</td>
+              <td>Typo or wrong value</td>
+              <td>Use: plan | design | build | test | deploy</td>
+            </tr>
+            <tr>
+              <td>manifest.returns mismatch</td>
+              <td>outputs keys don't match returns list</td>
+              <td>Make both lists identical</td>
+            </tr>
+            <tr>
+              <td>run_id_source wrong value</td>
+              <td>Edited the fixed field</td>
+              <td>Always: "X-Run-ID header"</td>
+            </tr>
+            <tr>
+              <td>shared_io pattern mismatch</td>
+              <td>Capital letters or hyphens in folder name</td>
+              <td>Lowercase underscores only: bs_docs</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── SECTION 4: AFTER CONFIG ── -->
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-num purple">4</div>
+      <div>
+        <div class="section-title">After config is valid</div>
+        <div class="section-sub">place file · create SKILL.md · update GenWiz sequence</div>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step-card">
+        <div class="step-hdr purple">
+          <span class="step-badge purple">PLACE</span>
+          <span class="step-name">Config is already in configs/ — confirm it's there</span>
+        </div>
+        <div class="step-body">
+          <div class="code-block">
+<span class="path">ADLC/configs/</span>
+├── ADLC_Tech_Stack_Config.json
+├── PL-04_Gap_Detection_Config.json
+├── DE-08_Data_Design_Config.json
+└── <span class="ok">DE-09_Unit_Test_Generation_Config.json  ← new</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr purple">
+          <span class="step-badge purple">SKILL.md</span>
+          <span class="step-name">Create the matching SKILL.md file</span>
+        </div>
+        <div class="step-body">
+          <div class="step-desc">The generator tells you exactly which file to create. Copy SKILL_MD_TEMPLATE.md and fill it using the config as your source of truth.</div>
+          <div class="code-block">
+<span class="cmt"># copy template</span>
+<span class="cmd">cp SKILL_MD_TEMPLATE.md skills/DE-09_Unit_Test_Generation_SKILL.md</span>
+
+<span class="cmt"># open and fill {{PLACEHOLDERS}} using your config values</span>
+<span class="cmt"># every field name in SKILL.md must match config exactly</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr purple">
+          <span class="step-badge purple">GENWIZ</span>
+          <span class="step-name">Add agent to GenWiz integration config</span>
+        </div>
+        <div class="step-body">
+          <div class="step-desc">Add the new agent to the plan sequence in GenWiz_ADLC_Integration_Config.json.</div>
+          <div class="code-block">
+<span class="cmt">// GenWiz_ADLC_Integration_Config.json → agent_sequence.plan.sequence</span>
+{ <span class="str">"step"</span>: 9, <span class="str">"id"</span>: <span class="str">"AD-09"</span>, <span class="str">"owner"</span>: <span class="str">"adlc"</span>, <span class="str">"name"</span>: <span class="str">"Unit Test Generation"</span> }
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── RULES ── -->
+  <div class="rules">
+    <div class="rules-title">⚠ Rules — every developer must follow these</div>
+    <div class="rule-row"><span class="rule-icon">✗</span> Never copy from another agent's config — always use the generator or template</div>
+    <div class="rule-row"><span class="rule-icon">✗</span> Never manually edit agent.id format — use phase prefix: PL / DE / BU / VA / OP or GW for GenWiz</div>
+    <div class="rule-row"><span class="rule-icon">✗</span> Never change run_id_source or thread_id_source — these are system-wide constants</div>
+    <div class="rule-row"><span class="rule-icon">✗</span> Never add iteration_1 or iteration_2 wrappers — flat structure only</div>
+    <div class="rule-row"><span class="rule-icon">✗</span> Never add on_gap, retry_attempts, confidence_threshold to llm_config_override — inherited from tech stack</div>
+    <div class="rule-row"><span class="rule-icon">✓</span> Always run validate_config.py before submitting a PR</div>
+    <div class="rule-row"><span class="rule-icon">✓</span> Always create SKILL.md after config — config is the source of truth for SKILL.md</div>
+    <div class="rule-row"><span class="rule-icon">✓</span> Always update GenWiz sequence when adding a new ADLC agent</div>
+  </div>
+
+</div>
+</body>
+</html>

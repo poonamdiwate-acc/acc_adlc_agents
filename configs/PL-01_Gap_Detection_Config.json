@@ -1,24 +1,18 @@
 {
   "agent": {
-    "id": "AD-04",
+    "id": "PL-01",
     "name": "Gap Detection Agent",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Analyses structured requirements to identify gaps, ambiguities, missing information, and implied but unstated requirements. Returns a gap report with severity, category, and recommended resolution per item.",
     "phase": "plan",
     "standalone": true,
     "endpoint": "/agents/gap-detection",
     "mcp_tool_name": "run_gap_detection",
-    "skill_file": "AD-04_Gap_Detection_SKILL.md",
-    "step_number": 4,
-    "previous_step": {
-      "step_number": 3,
-      "agent_id": "PL-01",
-      "agent_name": "Requirement Specification"
-    }
+    "skill_file": "PL-01_Gap_Detection_SKILL.md"
   },
   "llm_config_override": {
-    "max_tokens": 8192,
-    "timeout_seconds": 60
+    "max_tokens": 16384,
+    "timeout_seconds": 180
   },
   "behaviour": {
     "on_empty_requirements": "stop_and_report",
@@ -33,7 +27,8 @@
       "out_of_scope_not_flagged",
       "non_measurable_nfr",
       "missing_actor",
-      "missing_business_value"
+      "missing_business_value",
+      "regulatory_non_compliance"
     ],
     "severity_levels": [
       "critical",
@@ -49,16 +44,14 @@
   },
   "manifest": {
     "takes_from": {
-      "shared_folder": {
-        "subfolder": "bs_docs",
-        "formats": ["json", "docx", "pdf", "html"],
-        "fields": [
-          "structured_requirements",
-          "business_case",
-          "project_context",
-          "scope_boundaries"
-        ]
-      }
+      "source": "shared_folder",
+      "formats": ["json", "docx", "pdf", "html"],
+      "fields": [
+        "structured_requirements",
+        "business_case",
+        "project_context",
+        "scope_boundaries"
+      ]
     },
     "returns": [
       "gap_report",
@@ -73,8 +66,7 @@
     "structured_requirements": {
       "required": true,
       "type": "array",
-      "git_path": "runs/{run_id}/plan/PL-01_output.json",
-      "json_field": "structured_requirements",
+      "source": "shared_folder",
       "min_items": 1,
       "on_fail": "stop_and_report"
     },
@@ -86,7 +78,9 @@
     "project_context": {
       "required": true,
       "type": "object",
-      "on_fail": "stop_and_report"
+      "on_fail": "stop_and_report",
+      "expected_fields": ["squad", "domain", "market", "project_name"],
+      "_note": "domain + market used by regulatory_gap_detection to load checklist. Skill skips gracefully if absent."
     },
     "scope_boundaries": {
       "required": false,
@@ -105,6 +99,7 @@
         "severity": "critical | high | medium | low",
         "description": "Plain English description of the gap",
         "recommendation": "Specific action to resolve the gap",
+        "regulation_ref": "string or null — specific article/standard reference (only for regulatory_non_compliance gaps)",
         "auto_resolvable": false
       }
     },
@@ -143,6 +138,13 @@
     "auto_resolution": {
       "enabled": false,
       "_note": "Deferred. Would auto-generate missing acceptance criteria for low-severity gaps."
+    },
+    "regulatory_gap_detection": {
+      "enabled": true,
+      "description": "Reads project_context.domain + project_context.market, loads a regulatory checklist, and checks each requirement against mandatory clauses. Flags missing coverage with specific article/standard references.",
+      "checklist_dir": "skills/regulatory",
+      "on_missing_checklist": "skip",
+      "default_severity": "critical"
     }
   },
   "tools": {
@@ -152,11 +154,11 @@
     }
   },
   "metadata": {
-    "id": "AD-04",
+    "id": "PL-01",
     "version": "1.1.0",
     "status": "ready_for_iteration_1",
     "last_updated": "2026-05-14",
-    "_renamed_from": "PL-GD-01 — renamed per ADLC_Tech_Stack_Config v2.0.0"
+    "_renamed_from": "AD-04 — renamed per ADLC_Tech_Stack_Config v2.0.0"
   },
   "supported_formats": {
     "input": ["json", "docx", "pdf", "html"],
@@ -173,14 +175,6 @@
   },
   "git_reader": {
     "enabled": false,
-    "repo_url": "ENV:ADLC_AUDIT_REPO_URL",
-    "auth_method": "ENV:GIT_TOKEN",
-    "branch": "main",
-    "run_id_source": "header",
-    "run_id_header": "X-Run-ID",
-    "read_path_pattern": "runs/{run_id}/{phase}/{agent_id}_output.json",
-    "phase": "plan",
-    "_enabled_note": "false → read from local files under tech_stack.git_reader.local_audit_dir. true → read from the real audit repo via GitPython. Toggle per environment.",
-    "_note": "run_id is passed by GenWiz as X-Run-ID header on every agent call. Agent uses it to resolve the path and read previous step output."
+    "_note": "Disabled — all input comes from shared_folder. Kept for backward compatibility with agent init code."
   }
 }
