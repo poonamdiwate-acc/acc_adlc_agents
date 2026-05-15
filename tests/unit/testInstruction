@@ -1,0 +1,7 @@
+.\.venv\Scripts\python.exe run.py
+
+# First time (creates sample input + calls agent):
+.\test_local.ps1 -ThreadId "threadid100" -SetupSample
+
+# After that:
+.\test_local.ps1 -ThreadId "threadid100"

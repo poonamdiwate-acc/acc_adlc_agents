@@ -53,7 +53,13 @@
     "input_validation": "pydantic_v2",
     "auth": "bearer_token",
     "auth_header": "Authorization",
-    "run_id_header": "X-Run-ID"
+    "run_id_header": "X-Run-ID",
+    "thread_id_header": "X-Thread-ID"
+  },
+  "shared_folder": {
+    "base_path": "C:\\SharedFolderAdlc",
+    "thread_id_header": "X-Thread-ID",
+    "_note": "All agents read input files from {base_path}/{thread_id}/{input_subfolder}/ and write output to {base_path}/{thread_id}/{output_subfolder}/. Supports json, docx, pdf, html."
   },
   "environment": {
     "GOOGLE_CLOUD_PROJECT": {
@@ -72,11 +78,6 @@
       "required": false,
       "description": "Set to 'true' to route google-genai calls through Vertex (already forced by code via vertexai=True)",
       "default": "true"
-    },
-    "ENV": {
-      "required": true,
-      "description": "dev | prod",
-      "default": "dev"
     },
     "GIT_TOKEN": {
       "required": true,

@@ -19,8 +19,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-from pathlib import Path
 from typing import Any, Dict
 
 from agents.de08_cost_optimization import behaviour, input_builder, output_parser
@@ -58,7 +56,8 @@ logger.info(
 
 async def run(payload: Dict[str, Any], run_id: str) -> Dict[str, Any]:
     """Execute one Cost & Optimization run."""
-    resolved = await _resolve_git_inputs(payload, run_id)
+    resolved = _normalize_payload(payload)
+    resolved = await _resolve_git_inputs(resolved, run_id)
     behaviour.validate_inputs(resolved, _inputs_cfg, _behaviour_cfg)
 
     user_message = input_builder.build_user_message(resolved)
@@ -110,33 +109,62 @@ async def run(payload: Dict[str, Any], run_id: str) -> Dict[str, Any]:
     }
 
 
+_ARCHITECTURE_KEYS = {"orchestrator_agent", "super_agents"}
+
+
+def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Map alternative input shapes to the canonical field names.
+
+    When the shared folder contains an ``agent_architecture.json`` (with keys
+    like ``orchestrator_agent`` / ``super_agents``) instead of a literal
+    ``agent_network_html`` string, serialise the architecture JSON into the
+    ``agent_network_html`` field so the LLM can reason over it.
+    """
+    normalized = dict(payload)
+    if not normalized.get("agent_network_html"):
+        arch_data = {
+            k: v for k, v in normalized.items()
+            if k in _ARCHITECTURE_KEYS and v
+        }
+        if arch_data:
+            normalized["agent_network_html"] = json.dumps(
+                arch_data, ensure_ascii=False, indent=2
+            )
+            logger.info(
+                "DE-08 normalized architecture JSON → agent_network_html (%d chars)",
+                len(normalized["agent_network_html"]),
+            )
+    return normalized
+
+
 async def _resolve_git_inputs(
     payload: Dict[str, Any], run_id: str
 ) -> Dict[str, Any]:
-    """Fetch every input that declares a ``git_path`` and merge into payload."""
+    """Fetch every input that declares a ``git_path`` and merge into payload.
+
+    Shared-folder values (already in payload) take precedence — if a field
+    is already present and non-empty we skip the git read.
+    """
     resolved = dict(payload)
-    dev_overrides = _dev_git_fixture_overrides()
     for field_name, spec in _inputs_cfg.items():
         if not isinstance(spec, dict):
             continue
         git_path_template = spec.get("git_path")
         if not git_path_template:
             continue
+        if resolved.get(field_name):
+            logger.info(
+                "DE-08 skipping git read (already in payload): field=%s",
+                field_name,
+            )
+            continue
         git_path = git_path_template.format(run_id=run_id)
         json_field = spec.get("json_field", field_name)
-        if field_name in dev_overrides:
-            fixture_path = dev_overrides[field_name]
-            logger.info(
-                "DE-08 reading dev fixture (override): field=%s path=%s",
-                field_name, fixture_path,
-            )
-            content = _read_dev_fixture(fixture_path, field_name)
-        else:
-            logger.info(
-                "DE-08 reading git input: field=%s path=%s reader=%s",
-                field_name, git_path, type(_git_reader).__name__,
-            )
-            content = await _git_reader.read_json(git_path)
+        logger.info(
+            "DE-08 reading git input: field=%s path=%s reader=%s",
+            field_name, git_path, type(_git_reader).__name__,
+        )
+        content = await _git_reader.read_json(git_path)
         if not isinstance(content, dict):
             from core.exceptions import GitReadError
             raise GitReadError(
@@ -146,41 +174,6 @@ async def _resolve_git_inputs(
             )
         resolved[field_name] = content.get(json_field)
     return resolved
-
-
-def _dev_git_fixture_overrides() -> Dict[str, Path]:
-    """Return ``{field_name: absolute fixture path}`` for the current run."""
-    if os.environ.get("ENV", "").lower() != "dev":
-        return {}
-    dev_block = _config.dev_config(AGENT_ID)
-    if not dev_block.get("enabled"):
-        return {}
-    raw = dev_block.get("git_input_fixtures") or {}
-    if not isinstance(raw, dict):
-        return {}
-    project_root = _config.project_root()
-    overrides: Dict[str, Path] = {}
-    for field, rel_path in raw.items():
-        if isinstance(rel_path, str) and rel_path.strip():
-            overrides[field] = (project_root / rel_path).resolve()
-    return overrides
-
-
-def _read_dev_fixture(path: Path, field_name: str) -> Dict[str, Any]:
-    """Read and JSON-parse a dev git_input_fixture file."""
-    from core.exceptions import GitReadError
-    if not path.is_file():
-        raise GitReadError(
-            f"Dev fixture not found for '{field_name}': {path}",
-            detail={"path": str(path), "field": field_name},
-        )
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise GitReadError(
-            f"Dev fixture for '{field_name}' is unreadable: {exc}",
-            detail={"path": str(path), "field": field_name},
-        ) from exc
 
 
 register(agent_id=AGENT_ID, handler=run, config=_config)

@@ -20,6 +20,7 @@ from the agent config.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -89,6 +90,47 @@ def validate_inputs(
         )
 
 
+def filter_repackaged_fr_ir(
+    nfr_specifications: List[Dict[str, Any]],
+    structured_requirements: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Remove NFRs that reference only FR/IR IDs and strip FR/IR refs from valid ones.
+
+    Rules:
+    - If an NFR has req_id_refs containing at least one NFR-xxx ID → keep it,
+      but strip any FR/IR refs from its list.
+    - If an NFR has req_id_refs containing ONLY FR/IR IDs → discard it.
+    - If an NFR has empty req_id_refs (LLM didn't reference anything) → keep it.
+      The LLM was instructed to only derive from NFR items, so empty refs likely
+      means it derived from architecture context or couldn't find the exact ID.
+    """
+    nfr_req_ids: Set[str] = set()
+    for req in structured_requirements:
+        req_id = req.get("req_id", "")
+        if re.match(r"^NFR[-_]", req_id, re.IGNORECASE):
+            nfr_req_ids.add(req_id)
+
+    filtered: List[Dict[str, Any]] = []
+    for nfr in nfr_specifications:
+        refs = nfr.get("req_id_refs") or []
+        if not refs:
+            filtered.append(nfr)
+            continue
+
+        nfr_refs = [ref for ref in refs if ref in nfr_req_ids]
+        non_nfr_refs = [ref for ref in refs if ref not in nfr_req_ids]
+
+        if nfr_refs:
+            nfr["req_id_refs"] = nfr_refs
+            filtered.append(nfr)
+        elif non_nfr_refs:
+            pass
+        else:
+            filtered.append(nfr)
+
+    return filtered
+
+
 def renumber_nfrs(nfr_specifications: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Enforce sequential NFR-### ids per AC-02 regardless of LLM output."""
     for index, nfr in enumerate(nfr_specifications, start=1):
@@ -122,16 +164,24 @@ def coerce_control_req_id_refs(
     controls: List[Dict[str, Any]],
     structured_requirements: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Strip invalid req_id_refs from security controls (same as NFR coercion)."""
-    valid_ids: Set[str] = {
-        r.get("req_id") for r in structured_requirements if isinstance(r, dict)
-    }
+    """Strip invalid and non-NFR req_id_refs from security controls.
+
+    Security controls should trace to NFR-prefixed requirements only.
+    FR/IR refs are stripped since security controls derive from NFR mandates,
+    not from functional or integration specs.
+    """
+    nfr_ids: Set[str] = set()
+    for r in structured_requirements:
+        if isinstance(r, dict):
+            req_id = r.get("req_id", "")
+            if re.match(r"^NFR[-_]", req_id, re.IGNORECASE):
+                nfr_ids.add(req_id)
     for control in controls:
         refs = control.get("req_id_refs")
         if not isinstance(refs, list):
             control["req_id_refs"] = []
             continue
-        control["req_id_refs"] = [ref for ref in refs if ref in valid_ids]
+        control["req_id_refs"] = [ref for ref in refs if ref in nfr_ids]
     return controls
 
 

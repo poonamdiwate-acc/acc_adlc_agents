@@ -107,6 +107,7 @@ def parse(
     the LLM produced.
     """
     payload = _load_json(raw_text)
+    _coerce_threat_surface_summary(payload)
 
     try:
         parsed = _AgentOutput.model_validate(payload)
@@ -150,25 +151,26 @@ def parse(
                 },
             )
 
+    _DOMAIN_FALLBACK_MAP = {
+        "observability": "audit_logging",
+        "monitoring": "audit_logging",
+        "logging": "audit_logging",
+        "access_control": "authorization",
+        "identity": "authentication",
+        "privacy": "data_protection",
+        "secrets_management": "encryption",
+        "key_management": "encryption",
+    }
+
     for index, control in enumerate(parsed.security_controls.controls):
         if control.domain not in doms:
-            raise OutputParseError(
-                f"Security control #{index + 1} has unknown domain '{control.domain}'",
-                detail={
-                    "control_id": control.control_id,
-                    "domain": control.domain,
-                    "allowed": sorted(doms),
-                },
+            resolved = _DOMAIN_FALLBACK_MAP.get(
+                control.domain.lower().replace(" ", "_").replace("-", "_"),
+                "compliance",
             )
+            control.domain = resolved
         if control.confidence not in confs:
-            raise OutputParseError(
-                f"Security control #{index + 1} has unknown confidence '{control.confidence}'",
-                detail={
-                    "control_id": control.control_id,
-                    "confidence": control.confidence,
-                    "allowed": sorted(confs),
-                },
-            )
+            control.confidence = "medium"
 
     nfr_dicts = []
     for item in parsed.nfr_specifications:
@@ -199,6 +201,16 @@ def parse(
         "nfr_specifications": nfr_dicts,
         "security_controls": sc_dict,
     }
+
+
+def _coerce_threat_surface_summary(payload: Dict[str, Any]) -> None:
+    """Coerce threat_surface_summary to string if LLM returned it as an object."""
+    sc = payload.get("security_controls")
+    if not isinstance(sc, dict):
+        return
+    tss = sc.get("threat_surface_summary")
+    if tss is not None and not isinstance(tss, str):
+        sc["threat_surface_summary"] = json.dumps(tss, ensure_ascii=False, indent=2)
 
 
 def _normalize_compliance_mappings(

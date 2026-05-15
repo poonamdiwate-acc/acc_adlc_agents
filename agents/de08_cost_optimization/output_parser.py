@@ -129,14 +129,10 @@ def parse(
     for index, opt in enumerate(parsed.optimization_plan):
         resolved_category = opt.category or opt.optimization_type
         if resolved_category not in opt_types:
-            raise OutputParseError(
-                f"Optimization #{index + 1} has unknown category '{resolved_category}'",
-                detail={
-                    "opt_id": opt.opt_id,
-                    "category": resolved_category,
-                    "allowed": sorted(opt_types),
-                },
-            )
+            resolved_category = resolved_category.lower().replace(" ", "_").replace("-", "_")
+            if resolved_category not in opt_types:
+                resolved_category = "architecture_change"
+            opt.category = resolved_category
         if opt.priority not in pris:
             raise OutputParseError(
                 f"Optimization #{index + 1} has unknown priority '{opt.priority}'",

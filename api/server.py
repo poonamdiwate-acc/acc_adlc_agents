@@ -20,6 +20,8 @@ import os
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.openapi.models import SecurityScheme as SecuritySchemeModel
+from fastapi.openapi.utils import get_openapi
 
 from api.middleware.auth import BearerTokenMiddleware
 from core.agent_registry import bootstrap
@@ -37,19 +39,44 @@ def create_app() -> FastAPI:
         title="ADLC Agent Service",
         version=tech_meta.get("version", "0.0.0"),
         description=tech_meta.get("description", ""),
+        swagger_ui_init_oauth={},
     )
+
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        schema["components"] = schema.get("components", {})
+        schema["components"]["securitySchemes"] = {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "description": "Enter your ADLC_API_KEY token",
+            }
+        }
+        schema["security"] = [{"BearerAuth": []}]
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi
 
     app.add_middleware(
         BearerTokenMiddleware,
         exempt_paths=("/health", "/ready", "/docs", "/openapi.json", "/redoc"),
     )
 
-    # Import order matters: health and agents both read the registry at
-    # import time, and `agents` must run after `bootstrap()`.
-    from api.routers import agents, health
+    # Import order matters: health, agents, and a2a all read the registry
+    # at import time, so they must run after `bootstrap()`.
+    from api.routers import a2a, agents, health
 
     app.include_router(health.router)
     app.include_router(agents.router)
+    app.include_router(a2a.router)
 
     return app
 
@@ -60,6 +87,8 @@ def _configure_logging(level: Optional[str] = None) -> None:
         level=getattr(logging, chosen, logging.INFO),
         format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
     )
+    # Silence noisy google-genai AFC info messages
+    logging.getLogger("google_genai.models").setLevel(logging.WARNING)
 
 
 app = create_app()

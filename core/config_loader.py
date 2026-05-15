@@ -96,13 +96,13 @@ class ADLCConfig:
         """Per-agent ``git_reader`` block (enabled flag, paths, branch, ...)."""
         return self._require_agent(agent_id).get("git_reader", {}) or {}
 
-    def dev_config(self, agent_id: str) -> Dict[str, Any]:
-        """Per-agent ``dev`` block (dev-only fixture fallbacks).
+    def shared_folder_config(self) -> Dict[str, Any]:
+        """System-wide ``shared_folder`` block from tech stack config."""
+        return self._tech.get("shared_folder", {}) or {}
 
-        Consumers must enforce the ENV=dev gate themselves — this method
-        only returns the declared block.
-        """
-        return self._require_agent(agent_id).get("dev", {}) or {}
+    def shared_io_config(self, agent_id: str) -> Dict[str, Any]:
+        """Per-agent ``shared_io`` block (input_subfolder, output_subfolder)."""
+        return self._require_agent(agent_id).get("shared_io", {}) or {}
 
     def tech_git_reader(self) -> Dict[str, Any]:
         """Tech-stack ``git_reader`` block (local_audit_dir, cache_dir, ...)."""

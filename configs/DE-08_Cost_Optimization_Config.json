@@ -20,8 +20,8 @@
   },
 
   "llm_config_override": {
-    "max_tokens":      12288,
-    "timeout_seconds": 75
+    "max_tokens":      16384,
+    "timeout_seconds": 90
   },
 
   "behaviour": {
@@ -64,12 +64,20 @@
 
   "manifest": {
     "takes_from": {
-      "git":         ["structured_requirements"],
-      "phase_input": ["agent_network_html"]
+      "shared_folder": {
+        "subfolder": "bs_docs",
+        "formats": ["json", "docx", "pdf", "html"],
+        "fields": [
+          "structured_requirements",
+          "agent_network_html"
+        ]
+      }
     },
-    "returns":         ["cost_estimate", "optimization_plan"],
-    "run_id_required": true,
-    "run_id_source":   "X-Run-ID header"
+    "returns": ["cost_estimate", "optimization_plan"],
+    "run_id_required": false,
+    "run_id_source": "X-Run-ID header (optional, defaults to thread_id)",
+    "thread_id_required": true,
+    "thread_id_source": "X-Thread-ID header"
   },
 
   "inputs": {
@@ -84,7 +92,7 @@
     "agent_network_html": {
       "required":    true,
       "type":        "string",
-      "description": "Raw HTML content of the agent-network / business-process diagram. Drives per-service cost estimation — extract services, data stores, external integrations, and communication patterns from the embedded diagram and surrounding markup.",
+      "description": "Architecture context for the system — may be raw HTML of a business-process/agent-network diagram, or a JSON agent-architecture specification. Drives per-service cost estimation — extract services, data stores, external integrations, and communication patterns.",
       "on_fail":     "stop_and_report"
     }
   },
@@ -182,16 +190,19 @@
     "commit_msg_pattern": "feat(DE-08): Cost & Optimization Agent · {run_id}"
   },
 
-  "dev": {
-    "enabled": true,
-    "phase_input_fixture": "tests/integration/fixtures/dev/DE-08_phase_input.json",
-    "git_input_fixtures": {
-      "structured_requirements": "tests/integration/fixtures/dev/DE-08_structured_requirements.json"
-    },
-    "phase_input_text_files": {
-      "agent_network_html": "tests/integration/fixtures/dev/Business_Process_Agent_Network.html"
-    },
-    "_note": "Used only when ENV=dev AND enabled=true. phase_input_fixture replaces an empty HTTP body. git_input_fixtures override the git/local fetch for the listed fields. phase_input_text_files load raw text files (HTML/MD/TXT) into the listed payload fields. In prod (ENV=prod) this whole block is ignored."
+  "supported_formats": {
+    "input": ["json", "docx", "pdf", "html"],
+    "output": ["json", "docx", "pdf", "html"],
+    "default_output": "json",
+    "freeform_extraction": {
+      "enabled": true,
+      "_note": "Free-form documents (docx/pdf/html) are parsed for text and then an LLM call extracts structured fields. No fixed template required."
+    }
+  },
+
+  "shared_io": {
+    "input_subfolder": "bs_docs",
+    "output_subfolder": "cost_response"
   },
 
   "metadata": {
