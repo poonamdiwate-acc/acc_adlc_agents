@@ -1,0 +1,154 @@
+{
+  "agent_id": "DE-03",
+  "run_id": "fixture-build",
+  "data_model": [
+    {
+      "entity_id": "DM-001",
+      "entity_name": "UserAccount",
+      "description": "Registered candidate or recruiter login.",
+      "attributes": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true,
+          "description": "Login email"
+        },
+        {
+          "name": "role",
+          "type": "enum",
+          "required": true,
+          "description": "candidate|recruiter"
+        }
+      ],
+      "relationships": [],
+      "req_id_refs": ["REQ-001", "REQ-006"],
+      "category": "core_business"
+    },
+    {
+      "entity_id": "DM-002",
+      "entity_name": "Resume",
+      "description": "Uploaded resume with checksum and storage URI.",
+      "attributes": [
+        {
+          "name": "resume_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "required": true,
+          "description": "FK to UserAccount"
+        },
+        {
+          "name": "file_uri",
+          "type": "string",
+          "required": true,
+          "description": "Storage path"
+        },
+        {
+          "name": "checksum",
+          "type": "string",
+          "required": true,
+          "description": "SHA256 hash"
+        }
+      ],
+      "relationships": [
+        {
+          "related_entity": "DM-001",
+          "relationship_type": "belongs_to",
+          "cardinality": "many_to_one"
+        }
+      ],
+      "req_id_refs": ["REQ-002"],
+      "category": "core_business"
+    },
+    {
+      "entity_id": "DM-003",
+      "entity_name": "JobRole",
+      "description": "Open job role posted by recruiter.",
+      "attributes": [
+        {
+          "name": "role_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "description": "Role title"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "description": "Role description"
+        },
+        {
+          "name": "recruiter_id",
+          "type": "uuid",
+          "required": true,
+          "description": "FK to UserAccount"
+        }
+      ],
+      "relationships": [
+        {
+          "related_entity": "DM-001",
+          "relationship_type": "belongs_to",
+          "cardinality": "many_to_one"
+        }
+      ],
+      "req_id_refs": ["REQ-003", "REQ-004"],
+      "category": "core_business"
+    },
+    {
+      "entity_id": "DM-004",
+      "entity_name": "AuditEvent",
+      "description": "Immutable audit log for recruiter actions.",
+      "attributes": [
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "required": true,
+          "description": "User who performed action"
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true,
+          "description": "Action type"
+        },
+        {
+          "name": "target_id",
+          "type": "uuid",
+          "required": true,
+          "description": "Target resource"
+        },
+        {
+          "name": "timestamp",
+          "type": "datetime",
+          "required": true,
+          "description": "UTC timestamp"
+        }
+      ],
+      "relationships": [],
+      "req_id_refs": ["REQ-005"],
+      "category": "audit_compliance"
+    }
+  ]
+}

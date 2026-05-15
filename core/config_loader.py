@@ -114,6 +114,15 @@ class ADLCConfig:
         """Per-agent ``shared_io`` block (input_subfolder, output_subfolder)."""
         return self._require_agent(agent_id).get("shared_io", {}) or {}
 
+    def dev_config(self, agent_id: str) -> Dict[str, Any]:
+        """Per-agent ``dev`` block (enabled, git_input_fixtures, phase_input_text_files, ...).
+
+        Returns an empty dict if the agent config has no ``dev`` block. Agents
+        consult this only when ``ENV=dev`` to substitute local fixtures in
+        place of git / phase_input reads — in prod the block is ignored.
+        """
+        return self._require_agent(agent_id).get("dev", {}) or {}
+
     def tech_git_reader(self) -> Dict[str, Any]:
         """Tech-stack ``git_reader`` block (local_audit_dir, cache_dir, ...)."""
         return self._tech.get("git_reader", {}) or {}

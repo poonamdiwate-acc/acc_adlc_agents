@@ -200,3 +200,5 @@ def bootstrap() -> None:
     it.
     """
     from agents.ad04_gap_detection import agent as ad04  # noqa: F401
+    from agents.de03_data_design import agent as de03  # noqa: F401
+    from agents.de04_api_contracts import agent as de04  # noqa: F401

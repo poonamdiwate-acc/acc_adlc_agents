@@ -22,6 +22,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Type
 
 from google import genai
@@ -199,7 +202,15 @@ class LLMClient:
                     ) from exc
                 raise
 
-            return _extract_text(response)
+            _check_finish_reason(
+                response,
+                agent_id=agent_id,
+                model=model,
+                max_tokens=max_tokens,
+            )
+            text = _extract_text(response)
+            _maybe_capture(agent_id, text, response)
+            return text
 
         raise LLMCallError(
             f"LLM exhausted {attempts_allowed} attempts on {model}",
@@ -212,6 +223,76 @@ class LLMClient:
                 ),
             },
         ) from last_error
+
+
+def _maybe_capture(agent_id: str, text: str, response: Any) -> None:
+    """If ``LLM_CAPTURE_DIR`` env var is set, dump raw LLM text + metadata.
+
+    Used to debug parser/schema failures without re-running live LLM calls.
+    Writes one file per LLM call: ``<agent_id>__<UTC>.txt`` containing the
+    raw text. A sibling ``.meta.json`` records finish_reason and model.
+    Quiet on errors — capture is a developer aid, not part of the contract.
+    """
+    capture_dir = os.environ.get("LLM_CAPTURE_DIR")
+    if not capture_dir:
+        return
+    try:
+        out_dir = Path(capture_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%f")
+        safe_agent = agent_id.replace("/", "_").replace(":", "_")
+        base = out_dir / f"{safe_agent}__{stamp}"
+        base.with_suffix(".txt").write_text(text or "", encoding="utf-8")
+        finish_reasons = []
+        for cand in getattr(response, "candidates", None) or []:
+            fr = getattr(cand, "finish_reason", None)
+            finish_reasons.append(getattr(fr, "name", None) or str(fr))
+        meta = {
+            "agent_id": agent_id,
+            "captured_at_utc": stamp,
+            "chars": len(text or ""),
+            "finish_reasons": finish_reasons,
+        }
+        import json as _json
+        base.with_suffix(".meta.json").write_text(
+            _json.dumps(meta, indent=2), encoding="utf-8"
+        )
+        logger.info(
+            "LLM capture: agent=%s file=%s chars=%d",
+            agent_id, base.with_suffix(".txt"), len(text or ""),
+        )
+    except Exception as exc:
+        logger.warning("LLM capture failed (ignored): %s", exc)
+
+
+def _check_finish_reason(
+    response: Any,
+    *,
+    agent_id: str,
+    model: str,
+    max_tokens: int,
+) -> None:
+    """Raise a clear ``LLMCallError`` when Gemini truncated the output.
+
+    Without this, a ``MAX_TOKENS`` finish silently returns malformed JSON
+    and the downstream parser fails with a misleading delimiter error
+    deep inside the truncated payload.
+    """
+    for cand in getattr(response, "candidates", None) or []:
+        reason = getattr(cand, "finish_reason", None)
+        reason_name = getattr(reason, "name", None) or str(reason) if reason else None
+        if reason_name and reason_name.upper() == "MAX_TOKENS":
+            raise LLMCallError(
+                f"LLM output truncated at max_tokens={max_tokens} "
+                f"(finish_reason=MAX_TOKENS). Increase llm_config_override.max_tokens "
+                f"or reduce the size of the input payload.",
+                detail={
+                    "agent_id": agent_id,
+                    "model": model,
+                    "max_tokens": max_tokens,
+                    "finish_reason": "MAX_TOKENS",
+                },
+            )
 
 
 def _extract_text(response: Any) -> str:
