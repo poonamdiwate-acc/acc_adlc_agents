@@ -11,8 +11,12 @@ The ``X-Run-ID`` header is required on every agent call (per
 the agent handler and echoed in the response.
 
 The ``X-Thread-ID`` header identifies the shared folder thread. The agent
-always reads input from ``{shared_folder.base_path}/{thread_id}/{input_subfolder}/``
-and writes output to ``{shared_folder.base_path}/{thread_id}/{output_subfolder}/``.
+reads input from one or more subfolders within ``{shared_folder.base_path}/{thread_id}/``:
+- Most agents use a single ``input_subfolder`` (e.g., ``bs_docs``)
+- Some agents use multiple ``input_subfolders`` to read from different sources
+  (e.g., DE-04 reads from both ``bs_docs`` and ``data_design_response``)
+- Special filtering: ``data_design_response`` folder reads only JSON files
+Outputs are written to ``{shared_folder.base_path}/{thread_id}/{output_subfolder}/``.
 """
 
 from __future__ import annotations
@@ -86,15 +90,28 @@ def _make_handler(endpoint: str):
         shared_io = cfg.shared_io_config(entry.agent_id)
 
         base_path = shared_cfg.get("base_path", "")
-        input_subfolder = shared_io.get("input_subfolder", "")
+        # Support both single input_subfolder and array input_subfolders
+        input_subfolder = shared_io.get("input_subfolder")
+        input_subfolders = shared_io.get("input_subfolders")
+        
+        if input_subfolders:
+            # Array of subfolders (e.g., DE-04)
+            input_folders_list = input_subfolders if isinstance(input_subfolders, list) else [input_subfolders]
+        elif input_subfolder:
+            # Single subfolder (e.g., AD-04, DE-03)
+            input_folders_list = [input_subfolder]
+        else:
+            input_folders_list = []
+            
         output_subfolder = shared_io.get("output_subfolder", "")
+        output_filename = shared_io.get("output_filename") or None
 
-        if not base_path or not input_subfolder:
+        if not base_path or not input_folders_list:
             raise HTTPException(
                 status_code=500,
                 detail={
                     "error": "server_misconfigured",
-                    "message": "shared_folder.base_path and shared_io.input_subfolder must be configured",
+                    "message": "shared_folder.base_path and shared_io.input_subfolder(s) must be configured",
                 },
             )
 
@@ -102,14 +119,24 @@ def _make_handler(endpoint: str):
             from core.llm_client import LLMClient
             llm_client = LLMClient()
             llm_config = cfg.llm_config(entry.agent_id)
-            payload = await read_inputs(
-                base_path=base_path,
-                thread_id=x_thread_id,
-                input_subfolder=input_subfolder,
-                agent_id=entry.agent_id,
-                llm_client=llm_client,
-                llm_config=llm_config,
-            )
+            
+            # Read from multiple folders and merge
+            payload = {}
+            for subfolder in input_folders_list:
+                # data_design_response should only read JSON files (DE-03 output)
+                extensions = [".json"] if subfolder == "data_design_response" else None
+                
+                folder_payload = await read_inputs(
+                    base_path=base_path,
+                    thread_id=x_thread_id,
+                    input_subfolder=subfolder,
+                    agent_id=entry.agent_id,
+                    llm_client=llm_client,
+                    llm_config=llm_config,
+                    allowed_extensions=extensions,
+                )
+                # Merge into main payload (later values override earlier ones)
+                payload.update(folder_payload)
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,
@@ -155,12 +182,54 @@ def _make_handler(endpoint: str):
                     agent_id=entry.agent_id,
                     result=result,
                     output_format=fmt,
+                    output_filename=output_filename,
                 )
             except OSError as exc:
                 logger.warning(
                     "Could not write to shared folder: agent=%s thread=%s err=%s",
                     entry.agent_id, x_thread_id, exc,
                 )
+            # When JSON is requested, also write companion formats for human viewing
+            # DE-04 (API Contracts): Write both JSON + DOCX
+            # Other agents: Write JSON + HTML
+            # Best-effort — never block the response on render/IO failures.
+            if fmt == "json":
+                companion_format = "docx" if entry.agent_id == "DE-04" else "html"
+                try:
+                    write_output(
+                        base_path=base_path,
+                        thread_id=x_thread_id,
+                        output_subfolder=output_subfolder,
+                        agent_id=entry.agent_id,
+                        result=result,
+                        output_format=companion_format,
+                        output_filename=output_filename,
+                    )
+                except Exception as exc:
+                    logger.info(
+                        "%s companion not written (skipped): agent=%s "
+                        "thread=%s err=%s",
+                        companion_format.upper(), entry.agent_id, x_thread_id, exc,
+                    )
+            
+            # DE-04: When DOCX is requested, also write JSON for downstream agents
+            elif fmt == "docx" and entry.agent_id == "DE-04":
+                try:
+                    write_output(
+                        base_path=base_path,
+                        thread_id=x_thread_id,
+                        output_subfolder=output_subfolder,
+                        agent_id=entry.agent_id,
+                        result=result,
+                        output_format="json",
+                        output_filename=output_filename,
+                    )
+                except Exception as exc:
+                    logger.info(
+                        "JSON companion not written (skipped): agent=%s "
+                        "thread=%s err=%s",
+                        entry.agent_id, x_thread_id, exc,
+                    )
 
         # --- HTTP response ---
         if fmt == "json":

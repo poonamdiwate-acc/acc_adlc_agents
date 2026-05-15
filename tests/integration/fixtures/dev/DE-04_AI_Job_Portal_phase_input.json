@@ -1,0 +1,14 @@
+{
+  "project_context": {
+    "squad": "talent-platform",
+    "domain": "recruitment",
+    "project_name": "ai-job-portal"
+  },
+  "business_case": "Build an AI-focused job portal that connects candidates with machine learning and data science roles. Strategic goals: (1) reduce manual recruiter effort by 60%, (2) onboard 500+ registered candidates in Q1, (3) GDPR-compliant candidate data handling end-to-end, and (4) full audit logging of every recruiter action for traceability. The platform must support role-based access for Candidates and Recruiters and use AI matching to surface the most relevant open roles per candidate.",
+  "constraints": {
+    "api_style": "REST",
+    "auth": "JWT bearer + OAuth2",
+    "versioning": "URL prefix /v1",
+    "data_residency": "EU"
+  }
+}

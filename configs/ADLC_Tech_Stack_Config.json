@@ -32,6 +32,8 @@
     "files": {
       "ADLC-TECH": "ADLC_Tech_Stack_Config.json",
       "PL-01": "PL-01_Gap_Detection_Config.json"
+      "DE-03": "DE-03_Data_Design_Config.json",
+      "DE-04": "DE-04_Api_Contracts_Config.json"
     },
     "_note": "Add new agent config files here as they are created. PL-00 removed — GenWiz owns orchestration."
   },
@@ -164,7 +166,9 @@
       "agent_registry.py"
     ],
     "agents": [
-      "pl01_gap_detection/"
+      "pl01_gap_detection/",
+      "de03_data_design/",
+      "de04_api_contracts/"
     ],
     "agent_subfiles": [
       "agent.py",
