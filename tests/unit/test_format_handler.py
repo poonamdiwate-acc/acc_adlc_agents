@@ -145,9 +145,9 @@ class TestJsonRenderer:
     def test_render(self):
         renderer = JsonRenderer()
         result = {"gap_report": [], "gap_summary": {"total_gaps_found": 0}}
-        output = renderer.render(result, agent_id="AD-04", run_id="test-001")
+        output = renderer.render(result, agent_id="PL-01", run_id="test-001")
         assert output.content_type == "application/json"
-        assert output.filename == "AD-04_output_test-001.json"
+        assert output.filename == "PL-01_output_test-001.json"
         parsed = json.loads(output.content)
         assert parsed == result
 
@@ -179,7 +179,7 @@ class TestHtmlRenderer:
                 "gaps_by_severity": {"critical": 0, "high": 1, "medium": 0, "low": 0},
             },
         }
-        output = renderer.render(result, agent_id="AD-04", run_id="test-001")
+        output = renderer.render(result, agent_id="PL-01", run_id="test-001")
         assert "text/html" in output.content_type
         html = output.content.decode("utf-8")
         assert "GAP-001" in html
@@ -188,7 +188,7 @@ class TestHtmlRenderer:
     def test_render_empty_report(self):
         renderer = HtmlRenderer()
         result = {"gap_report": [], "gap_summary": {"total_gaps_found": 0}}
-        output = renderer.render(result, agent_id="AD-04", run_id="test-002")
+        output = renderer.render(result, agent_id="PL-01", run_id="test-002")
         html = output.content.decode("utf-8")
         assert "No gaps detected" in html
 
@@ -220,7 +220,7 @@ class TestDocxRenderer:
                 "gaps_by_severity": {"critical": 0, "high": 1, "medium": 0, "low": 0},
             },
         }
-        output = renderer.render(result, agent_id="AD-04", run_id="test-001")
+        output = renderer.render(result, agent_id="PL-01", run_id="test-001")
         assert "wordprocessingml" in output.content_type
         # DOCX files start with PK (ZIP header)
         assert output.content[:2] == b"PK"
@@ -244,7 +244,7 @@ class TestFormatHandler:
     async def test_parse_input_json(self):
         content = json.dumps({"business_case": "test"}).encode("utf-8")
         result = await parse_input(
-            content, "application/json", agent_id="AD-04"
+            content, "application/json", agent_id="PL-01"
         )
         assert result == {"business_case": "test"}
 
@@ -252,17 +252,17 @@ class TestFormatHandler:
     async def test_parse_input_unsupported_format(self):
         with pytest.raises(ValueError, match="Unsupported input format"):
             await parse_input(
-                b"data", "application/octet-stream", agent_id="AD-04"
+                b"data", "application/octet-stream", agent_id="PL-01"
             )
 
     def test_render_output_json(self):
         result = {"gap_report": []}
-        output = render_output(result, "json", agent_id="AD-04", run_id="r1")
+        output = render_output(result, "json", agent_id="PL-01", run_id="r1")
         assert output.content_type == "application/json"
 
     def test_render_output_unsupported(self):
         with pytest.raises(ValueError, match="Unsupported output format"):
-            render_output({}, "xml", agent_id="AD-04", run_id="r1")
+            render_output({}, "xml", agent_id="PL-01", run_id="r1")
 
     def test_renderer_registry(self):
         assert get_renderer_for_format("json") is not None

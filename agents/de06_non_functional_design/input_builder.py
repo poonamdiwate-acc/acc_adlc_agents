@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 
 _NFR_PREFIX_RE = re.compile(r"^NFR[-_]", re.IGNORECASE)
@@ -51,12 +51,17 @@ def _is_nfr_requirement(req: Dict[str, Any]) -> bool:
 
 
 def _classify_requirements(
-    requirements: List[Dict[str, Any]],
+    requirements: Any,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """Partition requirements into NFR vs non-NFR."""
+    if not isinstance(requirements, list):
+        return {"nfr": []}
+
     nfr_items: List[Dict[str, Any]] = []
 
     for req in requirements:
+        if not isinstance(req, dict):
+            continue
         if _is_nfr_requirement(req):
             nfr_items.append(req)
 
@@ -85,21 +90,40 @@ def build_user_message(payload: Dict[str, Any]) -> str:
         "agent_network_html": payload.get("agent_network_html") or "",
     }
 
-    preamble = (
-        "INPUT CONTEXT:\n"
-        "- 'structured_requirements' below contains ONLY non-functional requirements "
-        "(NFR-prefixed). FR and IR items have been pre-filtered out.\n"
-        "- You MUST cover ALL items listed in 'structured_requirements' — each one must "
-        "produce at least one NFR specification.\n"
-        "- You MUST ALSO analyse 'agent_network_html' to derive ADDITIONAL NFRs for:\n"
-        "  * Scalability: per-service scaling targets based on topology and load patterns\n"
-        "  * Resilience: fault tolerance, circuit breakers, RPO/RTO for identified SPOFs\n"
-        "  * Observability: SLOs/SLIs, alerting thresholds, distributed tracing needs\n"
-        "- For security_controls: extract trust boundaries and external interfaces from "
-        "'agent_network_html' to identify threat surfaces and define controls.\n"
-        "- In req_id_refs, only reference IDs that appear in 'structured_requirements'. "
-        "For architecture-derived NFRs with no direct requirement source, reference the "
-        "most relevant NFR ID (e.g. availability or security requirement).\n\n"
-    )
+    nfr_items = classified["nfr"]
+
+    if nfr_items:
+        preamble = (
+            "INPUT CONTEXT:\n"
+            "- 'structured_requirements' below contains ONLY non-functional requirements "
+            "(NFR-prefixed). FR and IR items have been pre-filtered out.\n"
+            "- You MUST cover ALL items listed in 'structured_requirements' — each one must "
+            "produce at least one NFR specification.\n"
+            "- You MUST ALSO analyse 'agent_network_html' to derive ADDITIONAL NFRs for:\n"
+            "  * Scalability: per-service scaling targets based on topology and load patterns\n"
+            "  * Resilience: fault tolerance, circuit breakers, RPO/RTO for identified SPOFs\n"
+            "  * Observability: SLOs/SLIs, alerting thresholds, distributed tracing needs\n"
+            "- For security_controls: extract trust boundaries and external interfaces from "
+            "'agent_network_html' to identify threat surfaces and define controls.\n"
+            "- In req_id_refs, only reference IDs that appear in 'structured_requirements'. "
+            "For architecture-derived NFRs with no direct requirement source, reference the "
+            "most relevant NFR ID (e.g. availability or security requirement).\n\n"
+        )
+    else:
+        preamble = (
+            "INPUT CONTEXT:\n"
+            "- No structured NFR requirements were provided as input.\n"
+            "- You MUST derive ALL NFRs entirely from 'agent_network_html' architecture analysis.\n"
+            "- Analyse the architecture to design NFR specifications for:\n"
+            "  * Scalability: per-service scaling targets based on topology and load patterns\n"
+            "  * Performance: latency targets, throughput requirements per service\n"
+            "  * Availability: uptime SLAs, redundancy requirements, failover strategies\n"
+            "  * Resilience: fault tolerance, circuit breakers, RPO/RTO for identified SPOFs\n"
+            "  * Observability: SLOs/SLIs, alerting thresholds, distributed tracing needs\n"
+            "  * Security: authentication, authorization, encryption for each trust boundary\n"
+            "- For security_controls: extract trust boundaries and external interfaces from "
+            "'agent_network_html' to identify threat surfaces and define controls.\n"
+            "- Set req_id_refs to an empty array [] for all NFRs since no source requirements exist.\n\n"
+        )
 
     return preamble + json.dumps(body, ensure_ascii=False, indent=2)

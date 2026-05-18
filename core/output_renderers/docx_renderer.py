@@ -12,7 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 class DocxRenderer(OutputRenderer):
-    """Renders result as a structured Word document."""
+    """Renders result as a structured Word document.
+    
+    Agent-aware renderer that adapts to different output structures:
+    - PL-01 (Gap Detection): gap_report + gap_summary
+    - DE-04 (API Contracts): openapi_spec + schema_registry
+    - Generic fallback for other agents
+    """
 
     @property
     def format_name(self) -> str:
@@ -191,7 +197,7 @@ class DocxRenderer(OutputRenderer):
                 row[6].text = opt.get("trade_off", "")
 
     # ------------------------------------------------------------------
-    # AD-04: Gap Detection
+    # PL-01: Gap Detection
     # ------------------------------------------------------------------
 
     def _render_ad04(

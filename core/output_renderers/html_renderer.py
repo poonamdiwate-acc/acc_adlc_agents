@@ -51,8 +51,12 @@ class HtmlRenderer(OutputRenderer):
             agent_id=agent_id,
             run_id=run_id,
             result=result,
+            # PL-01 (Gap Detection) fields
             gap_report=result.get("gap_report", []),
             gap_summary=result.get("gap_summary", {}),
+            # DE-03 (Data Design) fields
+            data_model=result.get("data_model", []),
+            storage_selection=result.get("storage_selection", {}),
         )
 
         content = html_content.encode("utf-8")

@@ -44,14 +44,37 @@ def validate_inputs(
 ) -> None:
     """Raise :class:`PipelineStopError` if ``payload`` violates the config.
 
-    Per ``behaviour.on_empty_requirements: stop_and_report`` an empty
-    ``structured_requirements`` array stops the agent before any LLM call.
+    DE-06 can operate in two modes:
+    1. Requirements + architecture → NFRs from both sources
+    2. Architecture only → NFRs derived entirely from topology
+
+    Validation allows empty requirements when architecture is available.
     """
+    requirements = payload.get("structured_requirements")
+    if isinstance(requirements, str):
+        try:
+            import json as _json
+            requirements = _json.loads(requirements)
+            payload["structured_requirements"] = requirements
+        except (ValueError, TypeError):
+            requirements = []
+            payload["structured_requirements"] = requirements
+    if not isinstance(requirements, list):
+        requirements = []
+        payload["structured_requirements"] = requirements
+
+    agent_network_html = payload.get("agent_network_html")
+    has_architecture = bool(agent_network_html and str(agent_network_html).strip())
+
     for field_name, rules in inputs_cfg.items():
         if not isinstance(rules, dict):
             continue
-        required = bool(rules.get("required"))
         value = payload.get(field_name)
+
+        if field_name == "structured_requirements" and has_architecture:
+            continue
+
+        required = bool(rules.get("required"))
         if required and (value is None or value == ""):
             raise PipelineStopError(
                 f"Required input '{field_name}' is missing",
@@ -72,21 +95,10 @@ def validate_inputs(
                 },
             )
 
-    requirements = payload.get("structured_requirements") or []
-    if (
-        behaviour_cfg.get("on_empty_requirements") == "stop_and_report"
-        and not requirements
-    ):
+    if not has_architecture and not requirements:
         raise PipelineStopError(
-            "structured_requirements is empty",
+            "Neither structured_requirements nor agent_network_html provided",
             detail={"on_empty_requirements": "stop_and_report"},
-        )
-
-    agent_network_html = payload.get("agent_network_html")
-    if not agent_network_html or not str(agent_network_html).strip():
-        raise PipelineStopError(
-            "agent_network_html is required",
-            detail={"field": "agent_network_html"},
         )
 
 

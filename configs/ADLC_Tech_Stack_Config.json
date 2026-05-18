@@ -31,7 +31,7 @@
     "config_dir": "configs/",
     "files": {
       "ADLC-TECH": "ADLC_Tech_Stack_Config.json",
-      "AD-04": "AD-04_Gap_Detection_Config.json",
+      "PL-01": "PL-01_Gap_Detection_Config.json",
       "DE-06": "DE-06_Non_Functional_Design_Config.json",
       "DE-08": "DE-08_Cost_Optimization_Config.json"
     },
@@ -179,7 +179,7 @@
     "mcp": [
       "server.py",
       "resources/manifest.py",
-      "tools/ad04_tool.py"
+      "tools/pl01_tool.py"
     ],
     "api": [
       "server.py",

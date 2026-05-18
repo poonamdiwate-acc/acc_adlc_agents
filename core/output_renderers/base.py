@@ -31,7 +31,7 @@ class OutputRenderer(ABC):
 
         Args:
             result: The agent's structured output (gap_report, gap_summary, etc.)
-            agent_id: Agent identifier (e.g. "AD-04")
+            agent_id: Agent identifier (e.g. "PL-01")
             run_id: Run identifier for filenames
 
         Returns:

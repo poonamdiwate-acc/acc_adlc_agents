@@ -1,4 +1,4 @@
-"""AD-04 output parser — strict JSON parse + Pydantic v2 validation.
+"""PL-01 output parser — strict JSON parse + Pydantic v2 validation.
 
 The SKILL.md system prompt says: *Return only the JSON object. No
 explanation, no markdown, no preamble.* In practice some models still
@@ -40,6 +40,7 @@ class _GapItem(BaseModel):
     severity: str = Field(min_length=1)
     description: str = Field(min_length=1)
     recommendation: str = Field(min_length=1)
+    regulation_ref: str | None = None
     auto_resolvable: bool = False
 
 

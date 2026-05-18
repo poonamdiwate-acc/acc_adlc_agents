@@ -1,4 +1,4 @@
-"""AD-04 behaviour — config-driven rules around the LLM call.
+"""PL-01 behaviour — config-driven rules around the LLM call.
 
 Three concerns live here:
 

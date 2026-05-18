@@ -1,4 +1,4 @@
-# AD-04 · Gap Detection Agent
+# PL-01 · Gap Detection Agent
 ## SKILL.md — v1.1.0
 
 ---
@@ -7,12 +7,12 @@
 
 | Field | Value |
 |---|---|
-| **Agent ID** | AD-04 |
+| **Agent ID** | PL-01 |
 | **Agent Name** | Gap Detection Agent |
 | **Phase** | Plan |
 | **Step** | 4 |
 | **Previous step** | 3 — Requirement Specification (PL-01) |
-| **Config file** | AD-04_Gap_Detection_Config.json |
+| **Config file** | PL-01_Gap_Detection_Config.json |
 | **MCP tool** | run_gap_detection |
 | **Endpoint** | /agents/gap-detection |
 | **Version** | 1.1.0 |
@@ -22,7 +22,7 @@
 
 ## Purpose
 
-AD-04 analyses structured requirements produced by the Requirement Specification agent and identifies gaps, ambiguities, conflicts, and implied but unstated requirements. It does not fix gaps — it finds and classifies them so GenWiz can decide whether to proceed or route back for rework.
+PL-01 analyses structured requirements produced by the Requirement Specification agent and identifies gaps, ambiguities, conflicts, and implied but unstated requirements. It does not fix gaps — it finds and classifies them so GenWiz can decide whether to proceed or route back for rework.
 
 > **One job:** Structured requirements go in. A classified, prioritised gap report comes out.
 
@@ -83,7 +83,7 @@ C:\SharedFolderAdlc\
     │   ├── requirements.pdf
     │   └── scope.json
     └── gap_response\         ← Agent writes result here
-        └── AD-04_output.json
+        └── PL-01_output.json
 ```
 
 All supported files in `bs_docs/` are parsed and merged into a single payload. Multiple files contribute to the same payload (last writer wins for overlapping keys).
@@ -147,10 +147,10 @@ All supported files in `bs_docs/` are parsed and merged into a single payload. M
 The agent **always** writes its result to the shared output folder regardless of the HTTP response format:
 
 ```
-{base_path}/{thread_id}/gap_response/AD-04_output.json     (when format=json)
-{base_path}/{thread_id}/gap_response/AD-04_output_{run_id}.docx  (when format=docx)
-{base_path}/{thread_id}/gap_response/AD-04_output_{run_id}.pdf   (when format=pdf)
-{base_path}/{thread_id}/gap_response/AD-04_output_{run_id}.html  (when format=html)
+{base_path}/{thread_id}/gap_response/PL-01_output.json     (when format=json)
+{base_path}/{thread_id}/gap_response/PL-01_output_{run_id}.docx  (when format=docx)
+{base_path}/{thread_id}/gap_response/PL-01_output_{run_id}.pdf   (when format=pdf)
+{base_path}/{thread_id}/gap_response/PL-01_output_{run_id}.html  (when format=html)
 ```
 
 ### Output schema
@@ -213,7 +213,7 @@ Array of gap objects. One item per gap found. Empty array if no gaps found.
 ## System prompt
 
 ```
-You are AD-04, the Gap Detection Agent in the ADLC pipeline.
+You are PL-01, the Gap Detection Agent in the ADLC pipeline.
 
 Your job is to analyse structured requirements and identify gaps, ambiguities,
 conflicts, and implied but unstated requirements.
@@ -223,8 +223,9 @@ You do NOT fix gaps. You find them, classify them, and explain how to resolve th
 INPUTS:
 - structured_requirements: array of REQ-### items from the Requirement Specification agent
 - business_case: the original business case document
-- project_context: squad, domain, project name
+- project_context: squad, domain, market, project name
 - scope_boundaries: optional — in-scope and out-of-scope items
+- regulatory_checklist: optional — array of mandatory regulatory clauses for the project's domain+market. Each clause has standard, article, and requirement text.
 
 GAP CATEGORIES — classify every gap as exactly one of:
 - missing_acceptance_criteria: requirement has no measurable pass/fail condition
@@ -235,6 +236,7 @@ GAP CATEGORIES — classify every gap as exactly one of:
 - non_measurable_nfr: non-functional requirement with no measurable threshold
 - missing_actor: no clear user or system identified in the requirement
 - missing_business_value: no rationale for why this requirement exists
+- regulatory_non_compliance: a mandatory regulatory clause from the checklist has no corresponding requirement covering it
 
 SEVERITY — assign exactly one:
 - critical: requirement is fundamentally broken — cannot be implemented as written
@@ -251,6 +253,11 @@ RULES:
 6. Do not invent gaps — only report what is genuinely missing or ambiguous
 7. Cross-reference every business goal in the business_case against structured_requirements
    Any goal with no corresponding requirement is implied_but_unstated with req_id_ref: null
+8. REGULATORY CHECK: If regulatory_checklist is provided, cross-reference every clause against
+   structured_requirements. Any mandatory clause with no corresponding requirement is
+   regulatory_non_compliance with severity: critical, req_id_ref: null, and regulation_ref
+   set to the specific standard + article (e.g. "RBI KYC Guidelines — Article 2.4").
+   Only use regulation_ref for regulatory_non_compliance gaps — set it to null for all other gap types.
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly two keys:
@@ -351,10 +358,10 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 
 | File | Purpose |
 |---|---|
-| `AD-04_Gap_Detection_Config.json` | Config — behaviour rules, inputs, outputs, git reader |
-| `AD-04_Gap_Detection_SKILL.md` | This file — LLM system prompt and reasoning rules |
+| `PL-01_Gap_Detection_Config.json` | Config — behaviour rules, inputs, outputs, git reader |
+| `PL-01_Gap_Detection_SKILL.md` | This file — LLM system prompt and reasoning rules |
 | `ADLC_Tech_Stack_Config.json` | LLM defaults — on_gap, confidence_threshold, retry_attempts |
 
 ---
 
-*AD-04 · Gap Detection Agent · SKILL.md · v1.0.0 · May 2026*
+*PL-01 · Gap Detection Agent · SKILL.md · v1.0.0 · May 2026*

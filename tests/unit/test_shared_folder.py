@@ -110,7 +110,7 @@ class TestReadInputs:
             base_path=str(tmp_path),
             thread_id="t1",
             input_subfolder="bs_docs",
-            agent_id="AD-04",
+            agent_id="PL-01",
         )
         assert result["business_case"] == "test case"
         assert result["project_context"]["squad"] == "auth"
@@ -131,7 +131,7 @@ class TestReadInputs:
             base_path=str(tmp_path),
             thread_id="t1",
             input_subfolder="bs_docs",
-            agent_id="AD-04",
+            agent_id="PL-01",
         )
         assert result["business_case"] == "login system"
         assert result["project_context"]["squad"] == "auth"
@@ -143,7 +143,7 @@ class TestReadInputs:
                 base_path=str(tmp_path),
                 thread_id="missing",
                 input_subfolder="bs_docs",
-                agent_id="AD-04",
+                agent_id="PL-01",
             )
 
 
@@ -157,12 +157,12 @@ class TestWriteOutput:
             base_path=str(tmp_path),
             thread_id="t1",
             output_subfolder="gap_response",
-            agent_id="AD-04",
+            agent_id="PL-01",
             result=result,
             output_format="json",
         )
         assert path.is_file()
-        assert path.name == "AD-04_output.json"
+        assert path.name == "PL-01_output.json"
         content = json.loads(path.read_text(encoding="utf-8"))
         assert content == result
 
@@ -172,7 +172,7 @@ class TestWriteOutput:
             base_path=str(tmp_path),
             thread_id="t2",
             output_subfolder="gap_response",
-            agent_id="AD-04",
+            agent_id="PL-01",
             result=result,
         )
         assert (tmp_path / "t2" / "gap_response").is_dir()

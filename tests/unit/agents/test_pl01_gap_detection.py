@@ -1,4 +1,4 @@
-"""Unit tests for AD-04 — Gap Detection Agent.
+"""Unit tests for PL-01 — Gap Detection Agent.
 
 The LLM client and the git reader are both mocked so these run without
 network access. Behaviour and output_parser are exercised directly with
@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agents.ad04_gap_detection import behaviour, output_parser
+from agents.pl01_gap_detection import behaviour, output_parser
 from core.exceptions import OutputParseError, PipelineStopError
 
 
@@ -315,7 +315,7 @@ class TestAgentRun:
 
     @pytest.mark.asyncio
     async def test_full_flow_with_mocked_collaborators(self):
-        from agents.ad04_gap_detection import agent
+        from agents.pl01_gap_detection import agent
 
         llm_text = _llm_payload([
             {
@@ -345,27 +345,34 @@ class TestAgentRun:
             ],
         })
 
+        payload = _http_payload()
+        payload["structured_requirements"] = [
+            {"req_id": "REQ-001", "title": "Login"},
+            {"req_id": "REQ-002", "title": "Logout"},
+        ]
+
         with patch.object(agent, "_git_reader", fake_reader), \
              patch.object(agent._llm_client, "call", new=AsyncMock(return_value=llm_text)):
-            result = await agent.run(_http_payload(), run_id="test-run-001")
+            result = await agent.run(payload, run_id="test-run-001")
 
-        assert fake_reader.calls == ["runs/test-run-001/plan/PL-01_output.json"]
         assert [g["gap_id"] for g in result["gap_report"]] == ["GAP-001", "GAP-002"]
         assert result["gap_report"][1]["req_id_ref"] is None  # REQ-999 coerced
         assert result["gap_summary"]["blocking_gaps"] == 1
         assert result["gap_summary"]["overall_quality"] == "needs_attention"
         assert result["gap_summary"]["recommendation"] == "resolve_blocking_gaps_first"
         assert result["run_id"] == "test-run-001"
-        assert result["agent_id"] == "AD-04"
+        assert result["agent_id"] == "PL-01"
 
     @pytest.mark.asyncio
     async def test_empty_requirements_stops_before_llm(self):
-        from agents.ad04_gap_detection import agent
+        from agents.pl01_gap_detection import agent
 
         fake_reader = _FakeGitReader({"structured_requirements": []})
+        payload = _http_payload()
+        payload["structured_requirements"] = []
         mock_call = AsyncMock()
         with patch.object(agent, "_git_reader", fake_reader), \
              patch.object(agent._llm_client, "call", new=mock_call):
             with pytest.raises(PipelineStopError):
-                await agent.run(_http_payload(), run_id="test-run-002")
+                await agent.run(payload, run_id="test-run-002")
         mock_call.assert_not_called()

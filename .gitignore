@@ -7,6 +7,11 @@ secrets/
 # Generated agent outputs (dev convenience until git_writer.py exists)
 tests/outputs/
 
+# Captured LLM responses (developer aid, set via LLM_CAPTURE_DIR env var) —
+# may contain raw business-spec content. Keep folder, ignore contents.
+tests/_debug/*
+!tests/_debug/.gitkeep
+
 # Python
 __pycache__/
 *.py[cod]

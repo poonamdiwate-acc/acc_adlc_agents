@@ -1,0 +1,265 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ADLC Agent Config Schema",
+  "description": "Validates any ADLC agent config file. Version 1.0.0",
+  "version": "1.0.0",
+  "type": "object",
+  "required": [
+    "agent",
+    "llm_config_override",
+    "manifest",
+    "inputs",
+    "outputs",
+    "supported_formats",
+    "shared_io",
+    "metadata"
+  ],
+  "additionalProperties": false,
+
+  "properties": {
+
+    "agent": {
+      "type": "object",
+      "required": ["id", "name", "version", "phase", "endpoint", "skill_file"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(AD|GW)-[0-9]{2}$",
+          "description": "Agent ID. Format: AD-NN or GW-NN where NN is the two-digit step number.",
+          "examples": ["PL-01", "GW-05"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "description": "Human-readable agent name in Title Case.",
+          "examples": ["Gap Detection", "Unit Test Generation"]
+        },
+        "version": {
+          "type": "string",
+          "const": "1.0.0",
+          "description": "Agent version. Always 1.0.0 for new agents."
+        },
+        "phase": {
+          "type": "string",
+          "enum": ["plan", "design", "build", "test", "deploy"],
+          "description": "Phase this agent belongs to."
+        },
+        "endpoint": {
+          "type": "string",
+          "pattern": "^/agents/[a-z0-9-]+$",
+          "description": "REST endpoint path. Lowercase, hyphens only.",
+          "examples": ["/agents/gap-detection", "/agents/unit-test-generation"]
+        },
+        "skill_file": {
+          "type": "string",
+          "pattern": "^(AD|GW)-[0-9]{2}_[A-Za-z0-9_]+_SKILL\\.md$",
+          "description": "Matching SKILL.md filename.",
+          "examples": ["PL-01_Gap_Detection_SKILL.md"]
+        }
+      }
+    },
+
+    "llm_config_override": {
+      "type": "object",
+      "required": ["max_tokens", "timeout_seconds"],
+      "additionalProperties": false,
+      "properties": {
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 16384,
+          "description": "Maximum tokens for LLM response. Inherited defaults apply for all other LLM settings."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 300,
+          "description": "LLM call timeout in seconds."
+        }
+      }
+    },
+
+    "manifest": {
+      "type": "object",
+      "required": [
+        "takes_from",
+        "returns",
+        "run_id_required",
+        "run_id_source",
+        "thread_id_required",
+        "thread_id_source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "takes_from": {
+          "type": "object",
+          "required": ["source", "formats", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "shared_folder",
+              "description": "Input source. Always shared_folder."
+            },
+            "formats": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["json", "docx", "pdf", "html"] },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "Accepted input file formats."
+            },
+            "fields": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of field names this agent reads from input files."
+            }
+          }
+        },
+        "returns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "List of output field names this agent produces."
+        },
+        "run_id_required": {
+          "type": "boolean",
+          "const": true,
+          "description": "Run ID is always required."
+        },
+        "run_id_source": {
+          "type": "string",
+          "const": "X-Run-ID header",
+          "description": "Run ID source header. Always X-Run-ID header."
+        },
+        "thread_id_required": {
+          "type": "boolean",
+          "const": true,
+          "description": "Thread ID is always required."
+        },
+        "thread_id_source": {
+          "type": "string",
+          "const": "X-Thread-ID header",
+          "description": "Thread ID source header. Always X-Thread-ID header."
+        }
+      }
+    },
+
+    "inputs": {
+      "type": "object",
+      "description": "Input field validation rules. One key per input field.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["required", "type", "on_fail"],
+        "properties": {
+          "required": { "type": "boolean" },
+          "type": {
+            "type": "string",
+            "enum": ["string", "array", "object", "boolean", "integer", "number"]
+          },
+          "on_fail": {
+            "type": "string",
+            "enum": ["stop_and_report", "flag_and_continue"]
+          },
+          "on_missing": {
+            "type": "string",
+            "enum": ["proceed_without", "stop_and_report", "flag_and_continue"]
+          },
+          "min_items": { "type": "integer", "minimum": 1 },
+          "min_length": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+
+    "outputs": {
+      "type": "object",
+      "description": "Output field schemas. One key per output field.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["array", "object", "string"]
+          },
+          "description": { "type": "string", "minLength": 5 },
+          "item_schema": { "type": "object" },
+          "schema": { "type": "object" }
+        }
+      }
+    },
+
+    "supported_formats": {
+      "type": "object",
+      "required": ["input", "output", "default_output"],
+      "additionalProperties": false,
+      "properties": {
+        "input": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["json", "docx", "pdf", "html"] },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "output": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["json", "docx", "pdf", "html"] },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "default_output": {
+          "type": "string",
+          "enum": ["json", "docx", "pdf", "html"],
+          "description": "Default output format when ?format= is not specified."
+        }
+      }
+    },
+
+    "shared_io": {
+      "type": "object",
+      "required": ["input_subfolder", "output_subfolder"],
+      "additionalProperties": false,
+      "properties": {
+        "input_subfolder": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Input subfolder name. Lowercase, underscores only.",
+          "examples": ["bs_docs", "requirements"]
+        },
+        "output_subfolder": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Output subfolder name. Lowercase, underscores only.",
+          "examples": ["gap_response", "unit_test_response"]
+        }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "required": ["id", "version", "status", "last_updated"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(AD|GW)-[0-9]{2}$",
+          "description": "Must match agent.id exactly."
+        },
+        "version": {
+          "type": "string",
+          "const": "1.0.0"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "ready", "deprecated"],
+          "description": "Use draft while building, ready when validated."
+        },
+        "last_updated": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Date in YYYY-MM-DD format."
+        }
+      }
+    }
+
+  }
+}

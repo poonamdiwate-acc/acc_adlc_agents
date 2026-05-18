@@ -90,15 +90,28 @@ def _make_handler(endpoint: str):
         shared_io = cfg.shared_io_config(entry.agent_id)
 
         base_path = shared_cfg.get("base_path", "")
-        input_subfolder = shared_io.get("input_subfolder", "")
+        # Support both single input_subfolder and array input_subfolders
+        input_subfolder = shared_io.get("input_subfolder")
+        input_subfolders = shared_io.get("input_subfolders")
+        
+        if input_subfolders:
+            # Array of subfolders (e.g., DE-04)
+            input_folders_list = input_subfolders if isinstance(input_subfolders, list) else [input_subfolders]
+        elif input_subfolder:
+            # Single subfolder (e.g., PL-01, DE-03)
+            input_folders_list = [input_subfolder]
+        else:
+            input_folders_list = []
+            
         output_subfolder = shared_io.get("output_subfolder", "")
+        output_filename = shared_io.get("output_filename") or None
 
-        if not base_path or not input_subfolder:
+        if not base_path or not input_folders_list:
             raise HTTPException(
                 status_code=500,
                 detail={
                     "error": "server_misconfigured",
-                    "message": "shared_folder.base_path and shared_io.input_subfolder must be configured",
+                    "message": "shared_folder.base_path and shared_io.input_subfolder(s) must be configured",
                 },
             )
 
@@ -171,6 +184,7 @@ def _make_handler(endpoint: str):
                     agent_id=entry.agent_id,
                     result=result,
                     output_format=fmt,
+                    output_filename=output_filename,
                 )
             except Exception as exc:
                 logger.warning(

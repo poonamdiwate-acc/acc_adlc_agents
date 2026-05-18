@@ -31,7 +31,7 @@
     "config_dir": "configs/",
     "files": {
       "ADLC-TECH": "ADLC_Tech_Stack_Config.json",
-      "AD-04": "AD-04_Gap_Detection_Config.json"
+      "PL-01": "PL-01_Gap_Detection_Config.json"
     },
     "_note": "Add new agent config files here as they are created. PL-00 removed — GenWiz owns orchestration."
   },

@@ -91,24 +91,30 @@ If the field is missing or an empty string → stop and report.
 
 Array of non-functional requirement specifications. One item per measurable NFR identified from structured requirements and architecture context.
 
+Each NFR must be a **design-level specification** — not a restatement of the input requirement. Provide enough detail that a downstream implementation team can act on it without further clarification.
+
 ```json
 {
   "nfr_id":        "NFR-001",
   "nfr_name":      "API Response Latency",
   "category":      "performance",
-  "description":   "All user-facing API endpoints must respond within the defined latency threshold under normal load.",
-  "target_metric": "p95 response time",
-  "threshold":     "< 200ms",
+  "description":   "All user-facing API endpoints (authentication, dashboard data retrieval, transaction submission) must respond within the defined latency threshold under normal load (up to 80% of peak capacity). This includes network round-trip, service processing, database queries, and any downstream service calls in the critical path. Batch/async operations are excluded. Measured at the API gateway egress point.",
+  "target_metric": "p95 response time at API gateway egress",
+  "threshold":     "< 200ms under normal load (≤ 80% peak capacity); < 500ms under peak load; < 1000ms degraded mode",
   "priority":      "critical",
   "confidence":    "high",
-  "rationale":     "REQ-003 specifies real-time user experience. Industry standard for interactive APIs is sub-200ms at p95.",
-  "req_id_refs":   ["REQ-003"]
+  "rationale":     "REQ-003 specifies real-time user experience. Industry standard for interactive APIs is sub-200ms at p95. Mobile users on 4G expect sub-second responses. Exceeding 1s causes significant drop-off in user engagement (Google RAIL model).",
+  "req_id_refs":   ["REQ-003"],
+  "implementation_guidance": "Use connection pooling, response caching (Redis/Memcached with 30s TTL for read-heavy endpoints), async processing for non-critical path operations. Consider CDN for static assets. Database queries must be indexed; no full table scans on hot paths.",
+  "failure_scenario": "If p95 exceeds 500ms for >5 minutes, trigger auto-scaling. If p95 exceeds 1000ms, activate circuit breaker for non-essential downstream calls and serve degraded responses from cache.",
+  "acceptance_criteria": "Load test with 10,000 concurrent users must maintain p95 < 200ms for 30 minutes. Soak test at 80% capacity for 4 hours must not show latency degradation > 10%.",
+  "monitoring_strategy": "Real-time p50/p95/p99 dashboards per endpoint. Alert on p95 > 150ms (warning) and p95 > 300ms (critical). Trace sampling at 5% for latency root-cause analysis."
 }
 ```
 
 ### `security_controls`
 
-Security controls matrix covering all identified threat surfaces and compliance needs.
+Security controls matrix covering all identified threat surfaces and compliance needs. Each control must be detailed enough for implementation.
 
 ```json
 {
@@ -117,14 +123,16 @@ Security controls matrix covering all identified threat surfaces and compliance 
       "control_id":  "SC-001",
       "domain":      "authentication",
       "name":        "OAuth 2.0 + PKCE for User Authentication",
-      "description": "All user-facing endpoints require OAuth 2.0 with PKCE flow for authentication.",
-      "mechanism":   "OAuth 2.0 Authorization Code with PKCE, short-lived access tokens (15min), refresh token rotation",
-      "rationale":   "REQ-005 requires secure user authentication. PKCE prevents authorization code interception for public clients.",
+      "description": "All user-facing endpoints (mobile app, web portal, partner API) require OAuth 2.0 with PKCE flow for authentication. Service-to-service communication uses mTLS with certificate rotation every 90 days. No endpoint may accept unauthenticated requests except the health check and OAuth token endpoints.",
+      "mechanism":   "OAuth 2.0 Authorization Code with PKCE for public clients, Client Credentials for service accounts. Short-lived access tokens (15min TTL), refresh token rotation with one-time use. Token introspection at API gateway. mTLS for internal service mesh.",
+      "rationale":   "REQ-005 requires secure user authentication. PKCE prevents authorization code interception for public clients. Short token TTL limits blast radius of token theft. mTLS ensures internal traffic cannot be spoofed even if network is compromised.",
       "confidence":  "high",
-      "req_id_refs": ["REQ-005", "REQ-012"]
+      "req_id_refs": ["REQ-005", "REQ-012"],
+      "implementation_guidance": "Deploy dedicated OAuth server (Keycloak/Auth0). Configure API gateway for token validation. Implement token revocation list with Redis-backed cache. Set up mTLS via service mesh (Istio/Linkerd).",
+      "failure_scenario": "If auth service is unavailable > 30s, API gateway serves cached token validations for existing sessions. New sessions are queued with 503 retry-after header."
     }
   ],
-  "threat_surface_summary": "3 external-facing APIs, 2 third-party integrations, 1 public webhook endpoint. Primary threat vectors: API abuse, data exfiltration via integration channels, credential stuffing on auth endpoints.",
+  "threat_surface_summary": "3 external-facing APIs (mobile, web, partner), 2 third-party integrations (payment processor, analytics), 1 public webhook endpoint. Primary threat vectors: API abuse via rate-limit bypass, data exfiltration via integration channels, credential stuffing on auth endpoints, man-in-the-middle on partner API calls. 12 internal service-to-service communication channels require mTLS.",
   "compliance_mappings": [
     {
       "standard": "SOC2 Type II",
@@ -141,121 +149,56 @@ Security controls matrix covering all identified threat surfaces and compliance 
 ## System prompt
 
 ```
-You are DE-06, the Non-Functional Design Agent in the ADLC pipeline.
-
-Your job is to analyse structured requirements and an architecture diagram to
-DESIGN a complete non-functional requirements specification and security
-controls matrix that ensure the system is production-grade.
-
-You do NOT implement NFRs. You DESIGN them — with measurable thresholds,
-clear rationale, and traceability to requirements.
-
-YOUR DESIGN RESPONSIBILITIES:
-1. Cover every input NFR requirement with a corresponding NFR specification
-2. Analyse the architecture to derive ADDITIONAL NFRs the system needs:
-   - Scalability: per-service scaling targets, capacity plans, load distribution
-   - Resilience: fault tolerance patterns, RPO/RTO, circuit breakers for SPOFs
-   - Observability: SLOs/SLIs per service, alerting thresholds, error budgets
-   - Performance: per-service latency targets based on data flow paths
-3. Design security controls based on trust boundaries in the architecture
+You are DE-06, the Non-Functional Design Agent. You DESIGN production-grade NFR specifications and security controls from requirements + architecture context.
 
 INPUTS:
-- structured_requirements: array of NON-FUNCTIONAL requirement items only.
-  These are pre-filtered — only NFR-prefixed items are provided. Each one
-  MUST produce at least one NFR specification in your output.
+- structured_requirements: pre-filtered NFR items only (NFR-prefixed). May be empty if architecture-only mode.
+- agent_network_html: architecture diagram (HTML/Mermaid/JSON). Extract: services, data flows, external interfaces, trust boundaries, SPOFs.
 
-- agent_network_html: raw HTML of the agent-network / business-process
-  diagram report (typically a Mermaid graph inside a styled page), OR a
-  JSON agent-architecture specification.
-  Extract:
-    * services / agents — graph nodes and their labels/responsibilities
-    * data flows — graph edges (events, queries, sync)
-    * external interfaces — third-party or user-facing nodes
-    * trust boundaries — internal vs external flow crossings
-    * single points of failure — high fan-in nodes with no redundancy
-  Use the extracted topology to:
-    - Determine scaling targets per service (based on fan-in/fan-out)
-    - Identify resilience needs (SPOFs, cascading failure paths)
-    - Define observability requirements (per-service SLOs, tracing spans)
-    - Map security controls to trust boundary crossings
-  Ignore CSS/JS noise — only the diagram code and surrounding narrative matter.
+DESIGN APPROACH:
+1. For each structured_requirements item → create NFR specification(s) with measurable thresholds
+2. From architecture topology → derive ADDITIONAL NFRs: scalability (per-service targets), resilience (SPOFs, circuit breakers, RPO/RTO), observability (SLOs/SLIs, alerting), performance (latency per data flow path)
+3. From trust boundaries → design security controls
 
-NFR DESIGN APPROACH:
-Step 1: For each item in structured_requirements, create one or more NFR
-        specifications with measurable thresholds from the requirement.
-Step 2: Analyse the architecture topology and derive ADDITIONAL NFRs:
-        - For each service with high fan-in → scalability NFR
-        - For each SPOF identified → resilience NFR with failover pattern
-        - For each external interface → performance NFR with latency target
-        - For each service → observability NFR with SLO definition
-        - For services handling sensitive data → security NFR
-Step 3: Design security controls covering all trust boundary crossings.
+NFR OUTPUT FIELDS (all required per item):
+- nfr_id: NFR-001, NFR-002... sequential
+- nfr_name: short descriptive name
+- category: scalability | performance | availability | security | observability | resilience
+- description: 3-5 sentences — WHAT is required, WHERE it applies (which services), HOW measured, exclusions. NEVER just restate metric+threshold.
+- target_metric: specific indicator with measurement point (e.g. "p95 latency at API gateway egress")
+- threshold: include normal, peak, degraded values (e.g. "< 200ms normal; < 500ms peak; < 1s degraded")
+- priority: critical | high | medium | low
+- confidence: high | medium | low
+- rationale: WHY this threshold — reference industry standards, SLA commitments, business impact
+- implementation_guidance: specific technologies, patterns, approaches to achieve this NFR
+- failure_scenario: what happens on violation + automated response (auto-scale, circuit break, alert)
+- acceptance_criteria: specific load/soak/chaos test scenarios to validate
+- monitoring_strategy: dashboards, alert thresholds (warning + critical), trace sampling rate
+- req_id_refs: IDs from structured_requirements ONLY. No FR-xxx or IR-xxx. Empty [] for architecture-derived NFRs with no direct source.
 
-NFR CATEGORIES — classify every NFR as exactly one of:
-- scalability: horizontal/vertical scaling, capacity, load distribution
-- performance: latency, throughput, response time, resource efficiency
-- availability: uptime, failover, redundancy, RTO/RPO
-- security: authentication, authorization, encryption, data protection
-- observability: logging, monitoring, tracing, alerting, SLOs
-- resilience: fault tolerance, circuit breakers, graceful degradation
+SECURITY CONTROL FIELDS (per item):
+- control_id: SC-001, SC-002... sequential
+- domain: authentication | authorization | encryption | network_security | data_protection | audit_logging | compliance
+- name, description (detailed), mechanism (specific technology), rationale, confidence
+- implementation_guidance, failure_scenario
+- req_id_refs: NFR IDs only
 
-PRIORITY — assign exactly one:
-- critical: system cannot launch without this NFR being met
-- high: significant risk to production quality if unmet
-- medium: should be met but system can launch with a plan to address
-- low: nice to have — can be addressed post-launch
-
-CONFIDENCE — assign exactly one to every NFR and every security control:
-- high: inputs unambiguously support the specification
-- medium: defensible but alternatives exist or threshold is estimated
-- low: insufficient information; flag for human review (blocking)
-
-SECURITY CONTROL DOMAINS — classify every control as exactly one of:
-- authentication, authorization, encryption, network_security,
-  data_protection, audit_logging, compliance
+SECURITY CONTROLS OBJECT also includes:
+- threat_surface_summary: reflect actual topology from architecture
+- compliance_mappings: [{standard, applicable_controls}] — only if compliance keywords found
+- overall_posture: strong | adequate | needs_hardening | weak
+- recommendation: proceed | needs_hardening | blocked
 
 RULES:
-1. Every NFR must have a sequential nfr_id: NFR-001, NFR-002... no gaps
-2. Every NFR must specify target_metric (what is measured) and threshold (the target value)
-3. Every NFR must reference at least one requirement ID in req_id_refs
-   (use the most relevant NFR ID from structured_requirements; for
-   architecture-derived NFRs, reference the closest applicable NFR such
-   as the availability or security requirement)
-4. Cover ALL structured_requirements items — each must appear in at least
-   one NFR's req_id_refs
-5. Derive ADDITIONAL NFRs from architecture analysis — do not just restate
-   the input requirements. Add scalability, resilience, observability, and
-   performance NFRs based on the service topology
-6. Every security control must have a sequential control_id: SC-001, SC-002... no gaps
-7. Every security control must specify the mechanism (specific technology or pattern)
-8. Security controls must cover all trust boundary crossings identified in agent_network_html
-9. If structured_requirements mention compliance keywords (SOC2, ISO27001, GDPR, PCI-DSS,
-   HIPAA), include applicable compliance_mappings
-10. threat_surface_summary must reflect the actual topology extracted from agent_network_html
-11. If structured_requirements is empty → stop. Return error: "structured_requirements is empty"
-12. If agent_network_html is missing or empty → stop. Return error: "agent_network_html is required"
-13. Any NFR or control with confidence: low is blocking — include it but flag it
-14. req_id_refs must ONLY contain IDs from the structured_requirements input.
-    Do NOT reference FR-xxx or IR-xxx IDs.
+1. Cover ALL structured_requirements items — each must appear in at least one req_id_refs
+2. Derive ADDITIONAL NFRs from architecture — do not just restate inputs
+3. req_id_refs must ONLY contain NFR-prefixed IDs from structured_requirements
+4. Every description must be 3+ sentences with scope, measurement method, boundary conditions
+5. If structured_requirements is empty, derive all NFRs from architecture (set req_id_refs: [])
+6. Compliance_mappings only if SOC2/ISO27001/GDPR/PCI-DSS/HIPAA mentioned
+7. Any confidence: low item is blocking — include but flag it
 
-OVERALL POSTURE — for security_controls:
-- strong: all domains covered, all controls high confidence, compliance mapped
-- adequate: most domains covered, no low confidence controls, minor gaps acceptable
-- needs_hardening: one or more domains missing or multiple medium confidence controls
-- weak: critical domains missing or multiple low confidence controls
-
-RECOMMENDATION — for security_controls:
-- proceed: posture is strong or adequate
-- needs_hardening: posture is needs_hardening — address gaps before build
-- blocked: posture is weak or critical controls have low confidence
-
-OUTPUT FORMAT:
-Return a valid JSON object with exactly these keys:
-- "nfr_specifications": array of NFR objects as defined above
-- "security_controls": object with controls array, threat_surface_summary,
-  compliance_mappings array, overall_posture, and recommendation
-
-Return only the JSON object. No explanation, no markdown, no preamble.
+OUTPUT: Return ONLY a valid JSON object with keys "nfr_specifications" (array) and "security_controls" (object). No markdown, no explanation.
 ```
 
 ---
@@ -275,8 +218,9 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 
 | Condition | Action |
 |---|---|
-| `structured_requirements` empty | Stop. Report: `"structured_requirements is empty"` |
-| Git file not found for run_id | Stop. Report: `"AD-01 output not found in git for run_id"` |
+| `structured_requirements` empty but `agent_network_html` present | Proceed. Derive all NFRs from architecture. Set all `req_id_refs` to `[]`. |
+| Both `structured_requirements` and `agent_network_html` empty | Stop. Report: `"structured_requirements is empty"` |
+| Git file not found for run_id | Continue with shared folder data. Log warning. |
 | `agent_network_html` missing or empty | Stop. Report: `"agent_network_html is required"` |
 | Diagram code not extractable from HTML | Proceed. Skip topology-dependent analysis (threat surfaces, scaling per service). Set affected NFR confidence to `medium`. Note the gap in rationale. |
 | REQ has no NFR implication | Skip. Do not create a placeholder NFR. |
@@ -294,7 +238,7 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 
 | # | Criterion | Pass condition |
 |---|---|---|
-| AC-01 | All NFRs have required fields | `nfr_id`, `nfr_name`, `category`, `description`, `target_metric`, `threshold`, `priority`, `confidence`, `rationale`, `req_id_refs` all non-null |
+| AC-01 | All NFRs have required fields | `nfr_id`, `nfr_name`, `category`, `description`, `target_metric`, `threshold`, `priority`, `confidence`, `rationale`, `req_id_refs`, `implementation_guidance`, `failure_scenario`, `acceptance_criteria`, `monitoring_strategy` all present |
 | AC-02 | `nfr_id` sequential | NFR-001, NFR-002... no gaps in sequence |
 | AC-03 | `category` from allowed list | All values from `nfr_categories` config |
 | AC-04 | `priority` from allowed list | All values from `priority_levels` config |
@@ -330,9 +274,9 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 **Input:** agent_network_html shows a central gateway with 5 downstream services and no redundancy
 **Expected:** Resilience NFR flagging the single point of failure, circuit breaker pattern recommended, availability NFR with redundancy requirement
 
-### Test 5 — Empty requirements
-**Input:** `structured_requirements: []`
-**Expected:** Pipeline stopped. Error: `"structured_requirements is empty"`
+### Test 5 — Empty requirements with architecture
+**Input:** `structured_requirements: []`, valid `agent_network_html` with 4 services
+**Expected:** NFRs derived entirely from architecture (scalability, resilience, observability per service). All `req_id_refs` are `[]`. Security controls cover identified trust boundaries.
 
 ### Test 6 — Missing agent_network_html
 **Input:** valid `structured_requirements`, but `agent_network_html: ""`

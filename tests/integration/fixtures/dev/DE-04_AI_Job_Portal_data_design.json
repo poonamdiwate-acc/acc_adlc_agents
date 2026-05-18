@@ -1,0 +1,257 @@
+{
+  "agent_id": "DE-03",
+  "run_id": "fixture-build",
+  "data_model": [
+    {
+      "entity_id": "DM-001",
+      "entity_name": "UserAccount",
+      "description": "Registered candidate or recruiter login.",
+      "attributes": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true,
+          "description": "Login email"
+        },
+        {
+          "name": "role",
+          "type": "enum",
+          "required": true,
+          "description": "candidate|recruiter"
+        }
+      ],
+      "relationships": [],
+      "req_id_refs": [
+        "REQ-001",
+        "REQ-006"
+      ],
+      "category": "core_business",
+      "normalization": null,
+      "confidence": "high"
+    },
+    {
+      "entity_id": "DM-002",
+      "entity_name": "Resume",
+      "description": "Uploaded resume with checksum and storage URI.",
+      "attributes": [
+        {
+          "name": "resume_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "required": true,
+          "description": "FK"
+        },
+        {
+          "name": "storage_uri",
+          "type": "string",
+          "required": true,
+          "description": "S3 URI"
+        }
+      ],
+      "relationships": [],
+      "req_id_refs": [
+        "REQ-002"
+      ],
+      "category": "core_business",
+      "normalization": null,
+      "confidence": "high"
+    },
+    {
+      "entity_id": "DM-003",
+      "entity_name": "Role",
+      "description": "Open role posted by a recruiter.",
+      "attributes": [
+        {
+          "name": "role_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "description": "Role title"
+        },
+        {
+          "name": "required_skills",
+          "type": "string[]",
+          "required": true,
+          "description": "Skill tags"
+        }
+      ],
+      "relationships": [],
+      "req_id_refs": [
+        "REQ-008"
+      ],
+      "category": "core_business",
+      "normalization": null,
+      "confidence": "high"
+    },
+    {
+      "entity_id": "DM-004",
+      "entity_name": "Application",
+      "description": "Candidate application to a role.",
+      "attributes": [
+        {
+          "name": "application_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "candidate_id",
+          "type": "uuid",
+          "required": true,
+          "description": "FK"
+        },
+        {
+          "name": "role_id",
+          "type": "uuid",
+          "required": true,
+          "description": "FK"
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": true,
+          "description": "Status"
+        }
+      ],
+      "relationships": [],
+      "req_id_refs": [
+        "REQ-003"
+      ],
+      "category": "transactional",
+      "normalization": null,
+      "confidence": "high"
+    },
+    {
+      "entity_id": "DM-005",
+      "entity_name": "MatchScore",
+      "description": "ML match score (candidate vs role).",
+      "attributes": [
+        {
+          "name": "match_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "candidate_id",
+          "type": "uuid",
+          "required": true,
+          "description": "FK"
+        },
+        {
+          "name": "role_id",
+          "type": "uuid",
+          "required": true,
+          "description": "FK"
+        },
+        {
+          "name": "score",
+          "type": "float",
+          "required": true,
+          "description": "0..1"
+        }
+      ],
+      "relationships": [],
+      "req_id_refs": [
+        "REQ-004"
+      ],
+      "category": "derived_analytical",
+      "normalization": null,
+      "confidence": "medium"
+    },
+    {
+      "entity_id": "DM-006",
+      "entity_name": "AuditEvent",
+      "description": "Immutable audit log of recruiter actions.",
+      "attributes": [
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "required": true,
+          "description": "PK"
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "required": true,
+          "description": "Recruiter"
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true,
+          "description": "view|download|status_change"
+        },
+        {
+          "name": "at",
+          "type": "datetime",
+          "required": true,
+          "description": "Timestamp"
+        }
+      ],
+      "relationships": [],
+      "req_id_refs": [
+        "REQ-005"
+      ],
+      "category": "audit_history",
+      "normalization": null,
+      "confidence": "high"
+    }
+  ],
+  "storage_selection": {
+    "primary_store": {
+      "technology": "PostgreSQL",
+      "rationale": "ACID + joins.",
+      "data_types": [
+        "UserAccount",
+        "Resume metadata",
+        "Role",
+        "Application",
+        "MatchScore",
+        "AuditEvent"
+      ],
+      "storage_class": "relational",
+      "confidence": "high"
+    },
+    "secondary_stores": [
+      {
+        "technology": "Amazon S3",
+        "purpose": "Resume blobs",
+        "rationale": "REQ-002 binary uploads.",
+        "storage_class": "object_blob",
+        "confidence": "high"
+      },
+      {
+        "technology": "Redis",
+        "purpose": "Session cache",
+        "rationale": "REQ-007 latency.",
+        "storage_class": "key_value",
+        "confidence": "high"
+      },
+      {
+        "technology": "OpenSearch",
+        "purpose": "Role browse",
+        "rationale": "REQ-008 filtering.",
+        "storage_class": "search",
+        "confidence": "medium"
+      }
+    ],
+    "overall_strategy": "Postgres SoT + S3 blobs + Redis cache + OpenSearch index."
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "_readme": "DE-04 Api Contracts Agent config. Generates OpenAPI specs and a schema registry from structured requirements and the data design output produced by DE-03.",
+
+  "agent": {
+    "id":            "DE-04",
+    "name":          "Api Contracts Agent",
+    "version":       "1.1.0",
+    "description":   "Generates OpenAPI endpoint specifications and registers schema contracts from business specifications and data design model via shared folder, producing a validated contract layer for downstream service implementation.",
+    "phase":         "design",
+    "standalone":    true,
+    "endpoint":      "/agents/api-contracts",
+    "mcp_tool_name": "run_api_contracts",
+    "skill_file":    "DE-04_Api_Contracts_SKILL.md",
+    "step_number":   9,
+    "previous_step": {
+      "step_number": 8,
+      "agent_id":    "DE-03",
+      "agent_name":  "Data Design"
+    }
+  },
+
+  "llm_config_override": {
+    "max_tokens": 32768,
+    "timeout_seconds": 180
+  },
+
+  "behaviour": {
+    "on_empty_requirements":  "stop_and_report",
+    "on_no_contracts_found":  "return_empty_registry",
+    "on_low_confidence":       "flag_and_continue",
+    "min_requirements":        1,
+    "contract_categories": [
+      "crud_endpoint",
+      "query_endpoint",
+      "event_endpoint",
+      "auth_endpoint",
+      "file_endpoint",
+      "integration_endpoint"
+    ],
+    "http_methods_allowed": [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "CONSUME",
+      "PUBLISH",
+      "SUBSCRIBE"
+    ],
+    "_methods_note": "GET/POST/PUT/PATCH/DELETE are standard HTTP verbs for crud_endpoint/query_endpoint/integration_endpoint. CONSUME/PUBLISH/SUBSCRIBE are event-driven verbs used for event_endpoint contracts (e.g., Kafka topics).",
+    "_blocking_note": "recommendation=blocked is returned to GenWiz as blocking — should be resolved before downstream design agents run"
+  },
+
+  "manifest": {
+    "takes_from": {
+      "shared_folder": {
+        "subfolder": "bs_docs",
+        "formats": ["json", "docx", "pdf", "html"],
+        "fields": [
+          "structured_requirements",
+          "data_model",
+          "project_context",
+          "business_case",
+          "constraints"
+        ]
+      }
+    },
+    "returns": ["openapi_spec", "schema_registry"],
+    "run_id_required": true,
+    "run_id_source": "X-Run-ID header",
+    "thread_id_required": true,
+    "thread_id_source": "X-Thread-ID header"
+  },
+
+  "inputs": {
+    "structured_requirements": {
+      "required": true,
+      "type": "array",
+      "git_path": "runs/{run_id}/plan/AD-01_output.json",
+      "json_field": "structured_requirements",
+      "min_items": 1,
+      "on_fail": "stop_and_report",
+      "description": "Array of REQ-### items extracted from business specification documents"
+    },
+    "data_model": {
+      "required": false,
+      "type": "array",
+      "git_path": "runs/{run_id}/design/data_design_model_and_strategy.json",
+      "json_field": "data_model",
+      "min_items": 0,
+      "on_fail": "proceed_without",
+      "description": "Array of DM-### entity definitions from data design (DE-03) output. If missing, agent will check for data_design_model_and_strategy field."
+    },
+    "project_context": {
+      "required": false,
+      "type": "object",
+      "on_fail": "proceed_without",
+      "description": "Project context extracted from business docs"
+    },
+    "business_case": {
+      "required": false,
+      "type": "string",
+      "on_fail": "proceed_without",
+      "description": "Business case description"
+    },
+    "constraints": {
+      "required": false,
+      "type": "object",
+      "on_missing": "proceed_without",
+      "description": "Optional API design constraints"
+    }
+  },
+
+  "outputs": {
+    "openapi_spec": {
+      "type":        "array",
+      "description": "One item per API endpoint contract derived from structured requirements and data design entities.",
+      "item_schema": {
+        "spec_id":           "OS-### sequential",
+        "endpoint_name":     "string",
+        "http_method":       "GET | POST | PUT | PATCH | DELETE",
+        "path":              "string",
+        "description":       "string",
+        "contract_category": "one of contract_categories",
+        "request_schema":    "object | null",
+        "response_schema":   "object | null",
+        "req_id_refs":       ["REQ-### from structured_requirements"],
+        "entity_refs":       ["DM-### from data_design_model_and_strategy"]
+      }
+    },
+    "schema_registry": {
+      "type":        "object",
+      "description": "Aggregated registry of all validated schemas and contract coverage across all endpoints.",
+      "schema": {
+        "total_requirements_analysed": "integer",
+        "total_contracts_generated":   "integer",
+        "uncovered_requirements":      "integer",
+        "registry_summary":            "string",
+        "contracts_by_category":       "object — count per contract_category",
+        "recommendation":              "proceed | review_required | blocked"
+      }
+    }
+  },
+
+  "skills": {
+    "openapi_builder": {
+      "enabled":     true,
+      "description": "Builds OpenAPI specification documents from structured requirements and data design entities, grouping endpoints by domain resource and HTTP method."
+    },
+    "schema_validator": {
+      "enabled":     true,
+      "description": "Validates all endpoint schemas against contract rules and flags inconsistencies, missing req_id_refs, duplicate paths, or disallowed HTTP methods."
+    },
+    "contract_store": {
+      "enabled":     true,
+      "description": "Compiles and indexes validated API contracts into the schema registry, computing coverage counts and setting the recommendation value."
+    }
+  },
+
+  "tools": {
+    "contract_classifier": {
+      "enabled":     true,
+      "description": "Classifies each generated endpoint by contract_category using the contract_categories list from behaviour."
+    }
+  },
+
+  "git_reader": {
+    "enabled":           false,
+    "repo_url":          "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":       "ENV:GIT_TOKEN",
+    "branch":             "main",
+    "run_id_source":     "header",
+    "run_id_header":     "X-Run-ID",
+    "read_path_pattern": "runs/{run_id}/{phase}/{agent_id}_output.json",
+    "phase":             "design",
+    "_enabled_note": "false → read from local files under tech_stack.git_reader.local_audit_dir. true → read from the real audit repo via GitPython. Toggle per environment.",
+    "_note": "run_id is passed by GenWiz as X-Run-ID header on every agent call. Agent uses it to resolve the path and read previous step output."
+  },
+
+  "git_writer": {
+    "repo_url": "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method": "ENV:GIT_TOKEN",
+    "branch": "main",
+    "write_path_pattern": "runs/{run_id}/design/api_contracts_and_schema_registry.json",
+    "commit_msg_pattern": "feat(DE-04): Api Contracts Agent · {run_id}"
+  },
+
+  "metadata": {
+    "id": "DE-04",
+    "version": "1.1.0",
+    "status": "ready_for_iteration_1",
+    "last_updated": "2026-05-15"
+  },
+  "supported_formats": {
+    "input": ["json", "docx", "pdf", "html"],
+    "output": ["json", "docx"],
+    "default_output": "json",
+    "_output_note": "Agent always writes both JSON and DOCX files. JSON is returned via HTTP. DOCX provides human-readable Word document with formatted tables.",
+    "freeform_extraction": {
+      "enabled": true,
+      "_note": "Free-form documents (docx/pdf/html) are parsed for text and then an LLM call extracts structured fields. No fixed template required."
+    }
+  },
+  "shared_io": {
+    "input_subfolders": ["bs_docs", "data_design_response"],
+    "output_subfolder": "api_contracts_response",
+    "output_filename": "api_contracts_design",
+    "_note": "API Contracts reads from TWO folders: bs_docs (all formats) and data_design_response (JSON only - DE-03 output)"
+  }
+}

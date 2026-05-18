@@ -1,29 +1,30 @@
-"""AD-04 — Gap Detection Agent entry point.
+"""DE-03 - Data Design Agent entry point.
 
 Standalone async handler matching the ``AgentHandler`` signature in
 :mod:`core.agent_registry`. The handler:
 
 1. Resolves any config-declared git-sourced inputs (e.g.
-   ``structured_requirements``) via the configured :class:`GitReader` —
+   ``structured_requirements``) via the configured :class:`GitReader` -
    local file in dev, real git in prod, picked per
    ``<agent>_Config.json#git_reader.enabled``.
 2. Validates the merged payload via :mod:`behaviour.validate_inputs`.
 3. Builds the user message and calls the LLM.
 4. Parses + validates the LLM JSON.
-5. Recomputes ``gap_summary`` deterministically (we do not trust the LLM
-   to count its own output).
-6. Returns the result dict — the HTTP / MCP layer serialises it.
+5. Renumbers entity ids and coerces req_id_refs deterministically (we do
+   not trust the LLM to enforce sequential ids or valid refs).
+6. Computes a deterministic blocking-confidence flag for downstream
+   routing.
+7. Returns the result dict - the HTTP / MCP layer serialises it.
 
 Self-registers on import via ``core.agent_registry.register``.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any, Dict
 
-from agents.ad04_gap_detection import behaviour, input_builder, output_parser
+from agents.de03_data_design import behaviour, input_builder, output_parser
 from core.agent_registry import register
 from core.config_loader import get_config
 from core.llm_client import LLMClient
@@ -32,7 +33,7 @@ from gitops.git_reader import GitReader, create_git_reader
 
 logger = logging.getLogger(__name__)
 
-AGENT_ID = "AD-04"
+AGENT_ID = "DE-03"
 
 
 _config = get_config()
@@ -50,27 +51,28 @@ _git_reader: GitReader = create_git_reader(
 )
 
 logger.info(
-    "AD-04 initialised: git_reader=%s endpoint=%s",
+    "DE-03 initialised: git_reader=%s endpoint=%s",
     type(_git_reader).__name__,
     _agent_cfg.get("agent", {}).get("endpoint"),
 )
 
 
 async def run(payload: Dict[str, Any], run_id: str) -> Dict[str, Any]:
-    """Execute one Gap Detection run.
+    """Execute one Data Design run.
 
     ``payload`` carries the phase_input fields (``business_case``,
-    ``project_context``, optional ``scope_boundaries``). Git-sourced
-    fields (e.g. ``structured_requirements``) are fetched here using
-    ``run_id`` against the configured :class:`GitReader`.
+    ``project_context``, optional ``constraints``). Git-sourced fields
+    (e.g. ``structured_requirements``) are fetched here using ``run_id``
+    against the configured :class:`GitReader`.
     """
     resolved = await _resolve_git_inputs(payload, run_id)
     behaviour.validate_inputs(resolved, _inputs_cfg, _behaviour_cfg)
 
     user_message = input_builder.build_user_message(resolved)
+    structured_requirements = resolved.get("structured_requirements") or []
     logger.info(
-        "AD-04 calling LLM: run_id=%s requirements=%d",
-        run_id, len(resolved.get("structured_requirements") or []),
+        "DE-03 calling LLM: run_id=%s requirements=%d",
+        run_id, len(structured_requirements),
     )
 
     raw_text = await _llm_client.call(
@@ -82,27 +84,43 @@ async def run(payload: Dict[str, Any], run_id: str) -> Dict[str, Any]:
 
     parsed = output_parser.parse(
         raw_text,
-        allowed_categories=_behaviour_cfg.get("gap_categories", []),
-        allowed_severities=_behaviour_cfg.get("severity_levels", []),
+        allowed_categories=_behaviour_cfg.get("entity_categories", []),
+        allowed_storage_classes=_behaviour_cfg.get("storage_classes", []),
+        allowed_confidence_levels=_behaviour_cfg.get("confidence_levels", []),
     )
 
-    gap_report = behaviour.coerce_req_id_refs(
-        parsed["gap_report"],
-        resolved.get("structured_requirements") or [],
+    data_model = behaviour.coerce_req_id_refs(
+        parsed["data_model"], structured_requirements,
     )
-    gap_report = behaviour.renumber_gaps(gap_report)
+    data_model = behaviour.renumber_entities(data_model)
+    storage_selection = parsed["storage_selection"]
 
-    gap_summary = behaviour.summarise(
-        gap_report,
-        total_requirements=len(resolved.get("structured_requirements") or []),
+    blocking_map = behaviour.blocking_items(
+        data_model=data_model,
+        storage_selection=storage_selection,
         behaviour_cfg=_behaviour_cfg,
     )
+    uncovered = behaviour.find_uncovered_requirements(
+        data_model, structured_requirements,
+    )
+
+    if behaviour.is_blocking(blocking_map):
+        logger.warning(
+            "DE-03 produced blocking-confidence items: run_id=%s entities=%s "
+            "stores=%s",
+            run_id, blocking_map["entities"], blocking_map["stores"],
+        )
+    if uncovered:
+        logger.info(
+            "DE-03 uncovered requirements (informational): run_id=%s reqs=%s",
+            run_id, uncovered,
+        )
 
     return {
         "agent_id": AGENT_ID,
         "run_id": run_id,
-        "gap_report": gap_report,
-        "gap_summary": gap_summary,
+        "data_model": data_model,
+        "storage_selection": storage_selection,
     }
 
 
@@ -121,17 +139,16 @@ async def _resolve_git_inputs(
         git_path_template = spec.get("git_path")
         if not git_path_template:
             continue
-        # Skip if already provided (e.g. from shared folder)
         if resolved.get(field_name):
             logger.info(
-                "AD-04 skipping git read: field=%s (already in payload)",
+                "DE-03 skipping git read: field=%s (already in payload)",
                 field_name,
             )
             continue
         git_path = git_path_template.format(run_id=run_id)
         json_field = spec.get("json_field", field_name)
         logger.info(
-            "AD-04 reading git input: field=%s path=%s reader=%s",
+            "DE-03 reading git input: field=%s path=%s reader=%s",
             field_name, git_path, type(_git_reader).__name__,
         )
         content = await _git_reader.read_json(git_path)

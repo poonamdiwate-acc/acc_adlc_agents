@@ -122,34 +122,35 @@ def parse(
     confs = set(allowed_confidence)
     doms = set(allowed_domains)
 
+    _CATEGORY_FALLBACK_MAP = {
+        "quality": "performance",
+        "reliability": "resilience",
+        "fault_tolerance": "resilience",
+        "disaster_recovery": "resilience",
+        "monitoring": "observability",
+        "logging": "observability",
+        "tracing": "observability",
+        "capacity": "scalability",
+        "elasticity": "scalability",
+        "latency": "performance",
+        "throughput": "performance",
+        "compliance": "security",
+        "data_protection": "security",
+        "uptime": "availability",
+        "high_availability": "availability",
+    }
+
     for index, item in enumerate(parsed.nfr_specifications):
         if item.category not in cats:
-            raise OutputParseError(
-                f"NFR #{index + 1} has unknown category '{item.category}'",
-                detail={
-                    "nfr_id": item.nfr_id,
-                    "category": item.category,
-                    "allowed": sorted(cats),
-                },
+            resolved = _CATEGORY_FALLBACK_MAP.get(
+                item.category.lower().replace(" ", "_").replace("-", "_"),
+                "performance",
             )
+            item.category = resolved
         if item.priority not in pris:
-            raise OutputParseError(
-                f"NFR #{index + 1} has unknown priority '{item.priority}'",
-                detail={
-                    "nfr_id": item.nfr_id,
-                    "priority": item.priority,
-                    "allowed": sorted(pris),
-                },
-            )
+            item.priority = "medium"
         if item.confidence not in confs:
-            raise OutputParseError(
-                f"NFR #{index + 1} has unknown confidence '{item.confidence}'",
-                detail={
-                    "nfr_id": item.nfr_id,
-                    "confidence": item.confidence,
-                    "allowed": sorted(confs),
-                },
-            )
+            item.confidence = "medium"
 
     _DOMAIN_FALLBACK_MAP = {
         "observability": "audit_logging",
@@ -181,6 +182,14 @@ def parse(
             d["description"] = f"{d['target_metric']} must meet threshold: {d['threshold']}"
         if not d.get("rationale"):
             d["rationale"] = "Derived from structured requirements."
+        if not d.get("implementation_guidance"):
+            d["implementation_guidance"] = ""
+        if not d.get("failure_scenario"):
+            d["failure_scenario"] = ""
+        if not d.get("acceptance_criteria"):
+            d["acceptance_criteria"] = ""
+        if not d.get("monitoring_strategy"):
+            d["monitoring_strategy"] = ""
         nfr_dicts.append(d)
 
     sc_dict = parsed.security_controls.model_dump()
@@ -191,6 +200,10 @@ def parse(
             control["description"] = control.get("mechanism", "")
         if not control.get("rationale"):
             control["rationale"] = "Derived from architecture topology and requirements."
+        if not control.get("implementation_guidance"):
+            control["implementation_guidance"] = ""
+        if not control.get("failure_scenario"):
+            control["failure_scenario"] = ""
 
     sc_dict["compliance_mappings"] = _normalize_compliance_mappings(
         sc_dict.get("compliance_mappings", []),

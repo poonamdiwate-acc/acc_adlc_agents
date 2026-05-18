@@ -68,9 +68,10 @@ async def run(payload: Dict[str, Any], run_id: str) -> Dict[str, Any]:
     behaviour.validate_inputs(resolved, _inputs_cfg, _behaviour_cfg)
 
     user_message = input_builder.build_user_message(resolved)
+    raw_reqs = resolved.get("structured_requirements") or []
     logger.info(
         "DE-06 calling LLM: run_id=%s requirements=%d",
-        run_id, len(resolved.get("structured_requirements") or []),
+        run_id, len(raw_reqs) if isinstance(raw_reqs, list) else 0,
     )
 
     raw_text = await _llm_client.call(
@@ -89,6 +90,8 @@ async def run(payload: Dict[str, Any], run_id: str) -> Dict[str, Any]:
     )
 
     requirements = resolved.get("structured_requirements") or []
+    if not isinstance(requirements, list):
+        requirements = []
 
     nfr_specifications = behaviour.coerce_req_id_refs(
         parsed["nfr_specifications"],
@@ -158,7 +161,9 @@ async def _resolve_git_inputs(
     """Fetch every input that declares a ``git_path`` and merge into payload.
 
     Shared-folder values (already in payload) take precedence — if a field
-    is already present and non-empty we skip the git read.
+    is already present and non-empty we skip the git read. Git read failures
+    are non-fatal: the field simply stays unresolved and downstream
+    validation decides whether that's acceptable.
     """
     resolved = dict(payload)
     for field_name, spec in _inputs_cfg.items():
@@ -167,7 +172,7 @@ async def _resolve_git_inputs(
         git_path_template = spec.get("git_path")
         if not git_path_template:
             continue
-        if resolved.get(field_name):
+        if field_name in resolved and resolved[field_name]:
             logger.info(
                 "DE-06 skipping git read (already in payload): field=%s",
                 field_name,
@@ -179,15 +184,20 @@ async def _resolve_git_inputs(
             "DE-06 reading git input: field=%s path=%s reader=%s",
             field_name, git_path, type(_git_reader).__name__,
         )
-        content = await _git_reader.read_json(git_path)
-        if not isinstance(content, dict):
-            from core.exceptions import GitReadError
-            raise GitReadError(
-                f"Expected JSON object at {git_path}, got "
-                f"{type(content).__name__}",
-                detail={"path": git_path, "field": field_name},
+        try:
+            content = await _git_reader.read_json(git_path)
+            if not isinstance(content, dict):
+                logger.warning(
+                    "DE-06 git read returned non-dict for field=%s path=%s",
+                    field_name, git_path,
+                )
+                continue
+            resolved[field_name] = content.get(json_field)
+        except Exception as exc:
+            logger.warning(
+                "DE-06 git read failed (non-fatal): field=%s path=%s err=%s",
+                field_name, git_path, exc,
             )
-        resolved[field_name] = content.get(json_field)
     return resolved
 
 

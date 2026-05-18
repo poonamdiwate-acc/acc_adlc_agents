@@ -1,0 +1,91 @@
+{
+  "agent": {
+    "id":          "{{PHASE_PREFIX}}-{{STEP_NUMBER}}",
+    "name":        "{{AGENT_NAME}}",
+    "version":     "1.0.0",
+    "phase":       "{{PHASE}}",
+    "endpoint":    "/agents/{{ENDPOINT_SLUG}}",
+    "skill_file":  "{{PHASE_PREFIX}}-{{STEP_NUMBER}}_{{AGENT_NAME_SLUG}}_SKILL.md"
+  },
+
+  "llm_config_override": {
+    "max_tokens":      "{{MAX_TOKENS}}",
+    "timeout_seconds": "{{TIMEOUT_SECONDS}}"
+  },
+
+  "manifest": {
+    "takes_from": {
+      "source":  "shared_folder",
+      "formats": ["json", "docx", "pdf", "html"],
+      "fields":  ["{{PRIMARY_INPUT_FIELD}}"]
+    },
+    "returns":            ["{{OUTPUT_FIELD_1}}", "{{OUTPUT_FIELD_2}}"],
+    "run_id_required":    true,
+    "run_id_source":      "X-Run-ID header",
+    "thread_id_required": true,
+    "thread_id_source":   "X-Thread-ID header"
+  },
+
+  "inputs": {
+    "{{PRIMARY_INPUT_FIELD}}": {
+      "required":  true,
+      "type":      "array",
+      "min_items": 1,
+      "on_fail":   "stop_and_report"
+    },
+    "project_context": {
+      "required": true,
+      "type":     "object",
+      "on_fail":  "stop_and_report"
+    },
+    "business_case": {
+      "required": true,
+      "type":     "string",
+      "on_fail":  "stop_and_report"
+    },
+    "constraints": {
+      "required":   false,
+      "type":       "object",
+      "on_missing": "proceed_without"
+    }
+  },
+
+  "outputs": {
+    "{{OUTPUT_FIELD_1}}": {
+      "type":        "array",
+      "description": "{{OUTPUT_FIELD_1_DESCRIPTION}}",
+      "item_schema": {
+        "{{ITEM_ID_FIELD}}":   "{{ID_PREFIX}}-### sequential",
+        "{{ITEM_NAME_FIELD}}": "string",
+        "description":         "string",
+        "req_id_refs":         ["REQ-### from structured_requirements"]
+      }
+    },
+    "{{OUTPUT_FIELD_2}}": {
+      "type":        "object",
+      "description": "{{OUTPUT_FIELD_2_DESCRIPTION}}",
+      "schema": {
+        "{{SUMMARY_FIELD}}": "string",
+        "recommendation":    "{{RECOMMENDATION_VALUES}}"
+      }
+    }
+  },
+
+  "supported_formats": {
+    "input":          ["json", "docx", "pdf", "html"],
+    "output":         ["json", "docx", "pdf", "html"],
+    "default_output": "json"
+  },
+
+  "shared_io": {
+    "input_subfolder":  "{{INPUT_SUBFOLDER}}",
+    "output_subfolder": "{{OUTPUT_SUBFOLDER}}"
+  },
+
+  "metadata": {
+    "id":           "{{PHASE_PREFIX}}-{{STEP_NUMBER}}",
+    "version":      "1.0.0",
+    "status":       "draft",
+    "last_updated": "{{DATE}}"
+  }
+}

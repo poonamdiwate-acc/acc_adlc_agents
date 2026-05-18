@@ -20,8 +20,8 @@
   },
 
   "llm_config_override": {
-    "max_tokens":      32768,
-    "timeout_seconds": 120
+    "max_tokens":      65536,
+    "timeout_seconds": 300
   },
 
   "behaviour": {
@@ -110,12 +110,16 @@
         "nfr_id":         "NFR-### sequential",
         "nfr_name":       "string",
         "category":       "scalability | performance | availability | security | observability | resilience",
-        "description":    "string",
-        "target_metric":  "string — the measurable indicator (e.g. p95 latency, uptime %, RPS)",
-        "threshold":      "string — the target value (e.g. < 200ms, 99.95%, 10000 RPS)",
+        "description":    "string — 3-5 sentences: what, where, how measured, exclusions",
+        "target_metric":  "string — specific measurable indicator with measurement point",
+        "threshold":      "string — normal, peak, and degraded mode values",
         "priority":       "critical | high | medium | low",
         "confidence":     "high | medium | low",
-        "rationale":      "string — why this threshold was chosen",
+        "rationale":      "string — why this threshold was chosen, referencing standards or business impact",
+        "implementation_guidance": "string — specific technical approaches to achieve this NFR",
+        "failure_scenario": "string — what happens on violation and automated response",
+        "acceptance_criteria": "string — specific test scenarios to validate",
+        "monitoring_strategy": "string — dashboards, alerts, warning/critical thresholds",
         "req_id_refs":    ["REQ-### from structured_requirements"]
       }
     },
@@ -128,11 +132,13 @@
             "control_id":   "SC-### sequential",
             "domain":       "authentication | authorization | encryption | network_security | data_protection | audit_logging | compliance",
             "name":         "string",
-            "description":  "string",
+            "description":  "string — detailed, 2-3 sentences",
             "mechanism":    "string — specific technology or pattern",
             "rationale":    "string",
+            "implementation_guidance": "string — specific deployment approach",
+            "failure_scenario": "string — fallback behavior on control failure",
             "confidence":   "high | medium | low",
-            "req_id_refs":  ["REQ-### from structured_requirements"]
+            "req_id_refs":  ["NFR-### from structured_requirements"]
           }
         ],
         "threat_surface_summary": "string — high-level summary of identified threat surfaces from agent_network_html",

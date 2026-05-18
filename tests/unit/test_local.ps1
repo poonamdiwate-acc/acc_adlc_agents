@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Local test script for AD-04 Gap Detection Agent.
+    Local test script for PL-01 Gap Detection Agent.
     Only parameter needed: thread ID (folder must already exist with input files).
 
 .USAGE
@@ -94,7 +94,7 @@ if ($inputFiles.Count -eq 0) {
     exit 1
 }
 
-Write-Host "`n=== AD-04 Local Test ===" -ForegroundColor Cyan
+Write-Host "`n=== PL-01 Local Test ===" -ForegroundColor Cyan
 Write-Host "Thread ID : $ThreadId"
 Write-Host "Format    : $Format"
 Write-Host "Input dir : $InputDir"

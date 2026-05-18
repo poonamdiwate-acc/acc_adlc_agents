@@ -17,7 +17,7 @@ Directory layout::
         │   ├── requirements.pdf
         │   └── scope.json
         └── {output_subfolder}/     ← agent writes result here
-            └── AD-04_output.json
+            └── PL-01_output.json
 """
 
 from __future__ import annotations
@@ -63,8 +63,20 @@ def resolve_output_folder(
     return folder
 
 
-def list_input_files(folder: Path) -> List[Path]:
-    """List all supported files in the input folder (non-recursive)."""
+def list_input_files(folder: Path, allowed_extensions: Optional[List[str]] = None) -> List[Path]:
+    """List all supported files in the input folder (non-recursive).
+
+    Skips Office lock files (``~$foo.docx``), dotfiles, and other hidden
+    OS artefacts. Word creates ``~$<name>`` lock files whenever a docx is
+    open in the desktop app, and those would otherwise be picked up by
+    extension and explode in the parsers.
+    
+    Args:
+        folder: Directory to scan
+        allowed_extensions: Optional list of extensions to filter (e.g., [".json"])
+                          If None, all supported extensions are allowed.
+    """
+    extensions_to_use = set(allowed_extensions) if allowed_extensions else _SUPPORTED_EXTENSIONS
     files = []
     for f in sorted(folder.iterdir()):
         if f.name.startswith("~$"):
@@ -74,7 +86,7 @@ def list_input_files(folder: Path) -> List[Path]:
     if not files:
         raise ValueError(
             f"No supported input files found in {folder}. "
-            f"Supported extensions: {sorted(_SUPPORTED_EXTENSIONS)}"
+            f"Supported extensions: {sorted(extensions_to_use)}"
         )
     return files
 
@@ -106,6 +118,16 @@ def _deep_merge(target: Dict[str, Any], source: Dict[str, Any]) -> None:
             _deep_merge(target[key], value)
         else:
             target[key] = value
+def _is_hidden_or_lockfile(path: Path) -> bool:
+    """True for Office lock files, dotfiles, and OS temp artefacts."""
+    name = path.name
+    if name.startswith("~$"):       # MS Office lock file (Word/Excel/PowerPoint)
+        return True
+    if name.startswith("."):         # dotfile (e.g. .DS_Store)
+        return True
+    if name.startswith("~"):         # legacy Office temp
+        return True
+    return False
 
 
 async def read_inputs(
@@ -116,6 +138,7 @@ async def read_inputs(
     agent_id: str,
     llm_client: Any = None,
     llm_config: Optional[Dict[str, Any]] = None,
+    allowed_extensions: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Read and merge all input files from the shared folder into a payload.
 
@@ -125,9 +148,12 @@ async def read_inputs(
 
     Multiple files are merged into a single dict (last writer wins for
     overlapping keys).
+    
+    Args:
+        allowed_extensions: Optional list of extensions to filter (e.g., [".json"])
     """
     folder = resolve_input_folder(base_path, thread_id, input_subfolder)
-    files = list_input_files(folder)
+    files = list_input_files(folder, allowed_extensions=allowed_extensions)
 
     logger.info(
         "Shared folder read: agent=%s thread=%s folder=%s files=%d",
@@ -135,6 +161,7 @@ async def read_inputs(
     )
 
     merged_payload: Dict[str, Any] = {}
+    extraction_errors: List[str] = []
 
     for file_path in files:
         content_type = _get_content_type(file_path)
@@ -145,16 +172,33 @@ async def read_inputs(
             file_path.name, content_type, len(file_bytes),
         )
 
-        parsed = await parse_input(
-            content=file_bytes,
-            content_type=content_type,
-            filename=file_path.name,
-            agent_id=agent_id,
-            llm_client=llm_client,
-            llm_config=llm_config,
+        try:
+            parsed = await parse_input(
+                content=file_bytes,
+                content_type=content_type,
+                filename=file_path.name,
+                agent_id=agent_id,
+                llm_client=llm_client,
+                llm_config=llm_config,
+            )
+            _deep_merge(merged_payload, parsed)
+        except Exception as exc:
+            logger.warning(
+                "Failed to parse %s (continuing with other files): %s",
+                file_path.name, exc,
+            )
+            extraction_errors.append(f"{file_path.name}: {exc}")
+
+    if not merged_payload and extraction_errors:
+        raise ValueError(
+            f"All input files failed to parse: {'; '.join(extraction_errors)}"
         )
 
-        _deep_merge(merged_payload, parsed)
+    if extraction_errors:
+        logger.warning(
+            "Shared folder read partial: agent=%s parsed_keys=%s errors=%s",
+            agent_id, list(merged_payload.keys()), extraction_errors,
+        )
 
     logger.info(
         "Shared folder merge complete: agent=%s keys=%s",
@@ -171,36 +215,31 @@ def write_output(
     agent_id: str,
     result: Dict[str, Any],
     output_format: str = "json",
+    output_filename: Optional[str] = None,
 ) -> Path:
-    """Write the agent result to the output folder.
+    """Write the agent result to the output folder in the requested format only.
 
-    Always writes JSON as the canonical output. If a non-JSON format is
-    requested, the rendered file is written alongside the JSON.
-
-    Returns the path of the rendered (requested format) file.
+    Writes exactly ONE file — the format requested via ``output_format``.
+    Returns the path of the written file.
     """
     folder = resolve_output_folder(base_path, thread_id, output_subfolder)
+    stem = (output_filename or f"{agent_id}_output").strip() or f"{agent_id}_output"
 
-    # Always write JSON as canonical output
-    json_path = folder / f"{agent_id}_output_{thread_id}.json"
-    json_path.write_text(
-        json.dumps(result, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    logger.info("Output written: %s", json_path)
-
-    out_path = json_path
-
-    # Additionally write the requested format if not JSON
-    if output_format != "json":
+    if output_format == "json":
+        out_path = folder / f"{agent_id}_output_{thread_id}.json"
+        out_path.write_text(
+            json.dumps(result, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    else:
         from core.format_handler import render_output
         rendered = render_output(
             result, output_format, agent_id=agent_id, run_id=thread_id
         )
-        out_path = folder / rendered.filename
+        out_path = folder / f"{stem}.{output_format}"
         out_path.write_bytes(rendered.content)
-        logger.info("Output written: %s", out_path)
 
+    logger.info("Output written: %s", out_path)
     return out_path
 
 

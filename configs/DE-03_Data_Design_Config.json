@@ -1,0 +1,226 @@
+{
+  "_readme": "DE-03 Data Design Agent config. Use this alongside AGENT_CONFIG_INSTRUCTIONS.md to understand how to fill your own agent config.",
+
+  "agent": {
+    "id":            "DE-03",
+    "name":          "Data Design Agent",
+    "version":       "1.0.0",
+    "description":   "Accepts structured requirements and designs the data layer — models, storage strategies, and governance.",
+    "phase":         "design",
+    "standalone":    true,
+    "endpoint":      "/agents/data-design",
+    "mcp_tool_name": "run_data_design",
+    "skill_file":    "DE-03_Data_Design_SKILL.md",
+    "step_number":   8,
+    "previous_step": {
+      "step_number": 7,
+      "agent_id":    "AD-07",
+      "agent_name":  "FinOps Architect"
+    }
+  },
+
+  "llm_config_override": {
+    "max_tokens":      32768,
+    "timeout_seconds": 180
+  },
+
+  "behaviour": {
+    "on_empty_requirements":   "stop_and_report",
+    "on_no_entities_derived":  "return_minimal_model",
+    "on_low_confidence":        "flag_and_continue",
+    "min_requirements":         1,
+    "entity_categories": [
+      "core_business",
+      "transactional",
+      "reference_lookup",
+      "audit_history",
+      "configuration",
+      "derived_analytical"
+    ],
+    "storage_classes": [
+      "relational",
+      "document",
+      "key_value",
+      "columnar",
+      "graph",
+      "vector",
+      "search",
+      "object_blob"
+    ],
+    "confidence_levels": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "blocking_confidence": [
+      "low"
+    ],
+    "_blocking_note": "Entities or storage selections produced with low confidence are flagged as blocking — must be reviewed before downstream agents (e.g. API Design, FinOps) consume the design."
+  },
+
+  "manifest": {
+    "takes_from": {
+      "shared_folder": {
+        "subfolder": "bs_docs",
+        "formats": ["json", "docx", "pdf", "html"],
+        "fields": [
+          "structured_requirements",
+          "volume_estimates",
+          "nfr_constraints"
+        ],
+        "_note": "Reads the same business spec doc that PL-01 (Gap Detection) consumes. NFR + volume info are extracted from the requirements doc via the DE-03 agent-specific extraction prompt."
+      },
+      "git": ["structured_requirements"]
+    },
+    "returns":         ["data_model", "storage_selection"],
+    "run_id_required": true,
+    "run_id_source":   "X-Run-ID header",
+    "thread_id_required": true,
+    "thread_id_source":   "X-Thread-ID header"
+  },
+
+  "inputs": {
+    "structured_requirements": {
+      "required":   true,
+      "type":       "array",
+      "git_path":   "runs/{run_id}/plan/AD-01_output.json",
+      "json_field": "structured_requirements",
+      "min_items":  1,
+      "on_fail":    "stop_and_report"
+    },
+    "volume_estimates": {
+      "required":    false,
+      "type":        "object",
+      "description": "Optional per-entity volume signals extracted from the requirements doc — initial_rows, growth_rate_yoy_pct, avg_record_size_kb, retention, peak read/write QPS, access_pattern. Drives storage_class selection (relational vs columnar vs object_blob) and primary/secondary store decisions. When absent the LLM falls back to qualitative NFR reasoning.",
+      "on_missing":  "proceed_without"
+    },
+    "nfr_constraints": {
+      "required":    false,
+      "type":        "object",
+      "description": "Optional non-functional constraints extracted from the requirements doc — latency_targets, availability_sla, durability, consistency_model, compliance_zones (PII/PCI/HIPAA), data_residency. Drives storage technology choice and replication strategy.",
+      "on_missing":  "proceed_without"
+    }
+  },
+
+  "outputs": {
+    "data_model": {
+      "type":        "array",
+      "description": "One item per entity or collection defined for the data layer.",
+      "item_schema": {
+        "entity_id":   "DM-### sequential",
+        "entity_name": "string",
+        "description": "string",
+        "attributes": [
+          {
+            "name":        "string",
+            "type":        "string",
+            "required":    "boolean",
+            "description": "string"
+          }
+        ],
+        "relationships": [
+          {
+            "entity":      "string",
+            "type":        "one_to_one | one_to_many | many_to_one | many_to_many",
+            "description": "string"
+          }
+        ],
+        "req_id_refs": ["REQ-### from structured_requirements"]
+      }
+    },
+    "storage_selection": {
+      "type":        "object",
+      "description": "Storage technology recommendation with rationale per storage concern.",
+      "schema": {
+        "primary_store": {
+          "technology": "string",
+          "rationale":  "string",
+          "data_types": ["string"]
+        },
+        "secondary_stores": [
+          {
+            "technology": "string",
+            "purpose":    "string",
+            "rationale":  "string"
+          }
+        ],
+        "overall_strategy": "string"
+      }
+    }
+  },
+
+  "skills": {
+    "data_modelling": {
+      "enabled":     true,
+      "description": "Derives entities, attributes, and relationships from structured requirements. Produces normalised entity definitions traceable to REQ-### items."
+    },
+    "storage_selection": {
+      "enabled":     true,
+      "description": "Evaluates storage technology options against project constraints and data access patterns. Recommends primary and secondary stores with rationale."
+    },
+    "normalization_review": {
+      "enabled":     true,
+      "description": "Reviews derived entities for normalisation level (1NF/2NF/3NF) and flags denormalisation opportunities driven by access patterns or NFRs."
+    },
+    "governance_tagging": {
+      "enabled":     false,
+      "_note": "Deferred. Would tag attributes with PII / sensitivity classifications for downstream compliance agents."
+    }
+  },
+
+  "tools": {
+    "entity_extractor": {
+      "enabled":     true,
+      "description": "Extracts candidate entities and attributes from structured_requirements using entity_categories from behaviour."
+    },
+    "storage_recommender": {
+      "enabled":     true,
+      "description": "Maps data access patterns and constraints to a storage_class from behaviour and selects a concrete technology."
+    }
+  },
+
+  "supported_formats": {
+    "input":  ["json", "docx", "pdf", "html"],
+    "output": ["json", "docx", "pdf", "html"],
+    "default_output": "json",
+    "freeform_extraction": {
+      "enabled": true,
+      "_note": "Free-form documents (docx/pdf/html) are parsed for text and then an LLM call extracts structured fields. No fixed template required."
+    }
+  },
+
+  "shared_io": {
+    "input_subfolder":  "bs_docs",
+    "output_subfolder": "data_design_response",
+    "output_filename":  "data_model_design"
+  },
+
+  "git_reader": {
+    "enabled":           false,
+    "repo_url":          "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":       "ENV:GIT_TOKEN",
+    "branch":            "main",
+    "run_id_source":     "header",
+    "run_id_header":     "X-Run-ID",
+    "read_path_pattern": "runs/{run_id}/{phase}/{agent_id}_output.json",
+    "phase":             "plan",
+    "_enabled_note": "false → read from local files under tech_stack.git_reader.local_audit_dir. true → read from the real audit repo via GitPython. Toggle per environment.",
+    "_note": "run_id is passed by GenWiz as X-Run-ID header on every agent call. Agent uses it to resolve the path and read previous step output."
+  },
+
+  "git_writer": {
+    "repo_url":           "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":        "ENV:GIT_TOKEN",
+    "branch":             "main",
+    "write_path_pattern": "runs/{run_id}/design/data_design_model_and_strategy.json",
+    "commit_msg_pattern": "feat(DE-03): Data Design Agent · {run_id}"
+  },
+
+  "metadata": {
+    "id":           "DE-03",
+    "version":      "1.4.0",
+    "status":       "ready_for_iteration_1",
+    "last_updated": "2026-05-15",
+    "_changes":     "v1.4.0 — removed agent_network_html input (never delivered via bs_docs in practice); renamed shared_folder outputs to data_model_design.{json,html} via shared_io.output_filename. v1.3.0 — removed dev fixture block to align with PL-01 pattern. v1.2.0 — bs_docs single source with PL-01, optional volume_estimates + nfr_constraints."
+  }
+}

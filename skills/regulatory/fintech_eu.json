@@ -1,0 +1,44 @@
+[
+  {
+    "standard": "GDPR",
+    "article": "Art. 17",
+    "clause": "Right to erasure — data subjects can request deletion of personal data",
+    "mandatory": true
+  },
+  {
+    "standard": "GDPR",
+    "article": "Art. 15",
+    "clause": "Right of access — data subjects can obtain confirmation of data processing",
+    "mandatory": true
+  },
+  {
+    "standard": "GDPR",
+    "article": "Art. 25",
+    "clause": "Data protection by design and by default",
+    "mandatory": true
+  },
+  {
+    "standard": "GDPR",
+    "article": "Art. 33",
+    "clause": "Notification of personal data breach to supervisory authority within 72 hours",
+    "mandatory": true
+  },
+  {
+    "standard": "PSD2",
+    "article": "Art. 97",
+    "clause": "Strong customer authentication for electronic payment transactions",
+    "mandatory": true
+  },
+  {
+    "standard": "PSD2",
+    "article": "Art. 67",
+    "clause": "Account information service providers must access only with explicit consent",
+    "mandatory": true
+  },
+  {
+    "standard": "EBA Guidelines on ICT Risk",
+    "article": "4.5",
+    "clause": "Business continuity and disaster recovery plans must be tested annually",
+    "mandatory": true
+  }
+]
