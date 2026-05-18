@@ -57,6 +57,12 @@ class HtmlRenderer(OutputRenderer):
             # DE-03 (Data Design) fields
             data_model=result.get("data_model", []),
             storage_selection=result.get("storage_selection", {}),
+            # PL-05 (FinOps Architect) fields
+            project_config_record=result.get("project_config_record", {}),
+            budget_allocation_plan=result.get("budget_allocation_plan", {}),
+            pps_threshold_config=result.get("pps_threshold_config", {}),
+            forecast_baseline=result.get("forecast_baseline", {}),
+            activation_summary=result.get("activation_summary", {}),
         )
 
         content = html_content.encode("utf-8")
