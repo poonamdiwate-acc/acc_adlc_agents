@@ -32,6 +32,7 @@ from core.output_renderers import (
     DocxRenderer,
     HtmlRenderer,
     JsonRenderer,
+    MarkdownRenderer,
     OutputRenderer,
     PdfRenderer,
 )
@@ -56,6 +57,8 @@ _RENDERERS: Dict[str, OutputRenderer] = {
     "docx": DocxRenderer(),
     "pdf": PdfRenderer(),
     "html": HtmlRenderer(),
+    "md": MarkdownRenderer(),
+    "markdown": MarkdownRenderer(),
 }
 
 SUPPORTED_INPUT_FORMATS = ["json", "docx", "pdf", "html", "md"]

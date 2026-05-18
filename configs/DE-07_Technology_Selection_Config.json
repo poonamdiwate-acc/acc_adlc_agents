@@ -1,0 +1,168 @@
+{
+  "_readme": "DE-07 Technology Selection Agent config. Use this alongside AGENT_CONFIG_INSTRUCTIONS.md to understand how to fill your own agent config.",
+
+  "agent": {
+    "id": "DE-07",
+    "name": "Technology Selection Agent",
+    "version": "1.0.0",
+    "description": "Evaluates architecture specifications and NFR requirements to recommend optimal technology stack with cloud deployment options and cost estimates.",
+    "phase": "design",
+    "standalone": true,
+    "endpoint": "/agents/technology-selection",
+    "mcp_tool_name": "run_technology_selection",
+    "skill_file": "DE-07_Technology_Selection_SKILL.md",
+    "step_number": 11,
+    "previous_step": {
+      "step_number": 10,
+      "agent_id": "DE-06",
+      "agent_name": "Agent Architecture Designer"
+    }
+  },
+  "llm_config_override": {
+    "max_tokens": 32768,
+    "timeout_seconds": 180
+  },
+  "manifest": {
+    "takes_from": {
+      "shared_folder": {
+        "subfolder": "bs_docs",
+        "formats": ["json", "docx", "pdf", "html"],
+        "fields": [
+          "functional_requirements",
+          "non_functional_requirements",
+          "business_rules_and_constraints",
+          "project_context",
+          "agent_architecture"
+        ],
+        "_note": "Reads structured requirements from bs_docs folder and agent_architecture.json from uploaded_files/brd. Requirements are parsed from DOCX/PDF documents into separate fields. NFR and constraints are extracted from the parsed documents."
+      },
+      "git": []
+    },
+    "returns": ["tech_stack_recommendations", "tech_stack_summary"],
+    "run_id_required": true,
+    "run_id_source": "X-Run-ID header",
+    "thread_id_required": true,
+    "thread_id_source": "X-Thread-ID header"
+  },
+  "inputs": {
+    "functional_requirements": {
+      "required": false,
+      "type": "array",
+      "description": "Functional requirements extracted from requirements documents"
+    },
+    "non_functional_requirements": {
+      "required": false,
+      "type": "array",
+      "description": "Non-functional requirements (NFR) extracted from requirements documents"
+    },
+    "business_rules_and_constraints": {
+      "required": false,
+      "type": "array",
+      "description": "Business rules and constraints extracted from requirements documents"
+    },
+    "project_context": {
+      "required": false,
+      "type": "object",
+      "description": "Project context information"
+    },
+    "agent_architecture": {
+      "required": true,
+      "type": "object",
+      "on_fail": "stop_and_report",
+      "description": "Agent architecture specification with component definitions, agent interactions, and deployment patterns"
+    }
+  },
+  "outputs": {
+    "tech_stack_recommendations": {
+      "type": "array",
+      "description": "Ranked technology recommendations with justification, alternatives, cloud mapping, and cost estimates",
+      "item_schema": {
+        "recommendation_id": "TS-### sequential",
+        "technology": "string",
+        "category": "string",
+        "version": "string",
+        "justification": "string",
+        "confidence_score": "float 0.0-1.0",
+        "alternatives": ["string array"],
+        "cloud_mapping": {
+          "gcp": "string",
+          "azure": "string",
+          "aws": "string"
+        },
+        "cost_estimate": {
+          "license": "string (free/commercial)",
+          "hosting_monthly": "string",
+          "support": "string"
+        },
+        "req_id_refs": ["REQ-### or NFR-### from inputs"]
+      }
+    },
+    "tech_stack_summary": {
+      "type": "object",
+      "description": "Overall technology stack summary with coverage, confidence, and recommendation",
+      "schema": {
+        "total_recommendations": "integer",
+        "categories_covered": ["array of strings"],
+        "overall_confidence": "float 0.0-1.0",
+        "registry_summary": "string",
+        "recommendation": "proceed | review_required | blocked"
+      }
+    }
+  },
+  "behaviour": {
+    "on_empty_requirements": "stop_and_report",
+    "on_missing_agent_architecture": "stop_and_report",
+    "on_no_recommendations": "stop_and_report",
+    "min_confidence_threshold": 0.6,
+    "recommendation_thresholds": {
+      "proceed": 0.8,
+      "review_required": 0.6,
+      "blocked": 0.0
+    },
+    "tech_categories": [
+      "backend_framework",
+      "database",
+      "messaging",
+      "api_gateway",
+      "monitoring",
+      "security",
+      "frontend",
+      "deployment"
+    ],
+    "min_categories_required": 5,
+    "extract_nfr_from_requirements": true,
+    "extract_constraints_from_requirements": true
+  },
+  "supported_formats": {
+    "input": ["json", "docx", "pdf", "html", "md"],
+    "output": ["json", "docx", "pdf", "html", "md"],
+    "default_output": "json"
+  },
+  "shared_io": {
+    "input_sources": [
+      {
+        "subfolder": "bs_docs",
+        "allowed_extensions": [".json", ".docx", ".pdf", ".html"],
+        "description": "Structured requirements with NFRs and constraints - merged from multiple files"
+      },
+      {
+        "subfolder": "uploaded_files/brd",
+        "file_name_patterns": ["agent_architecture.json"],
+        "required": true,
+        "field_name": "agent_architecture",
+        "description": "Agent architecture specification from uploaded BRD folder"
+      }
+    ],
+    "output_subfolder": "tech_selection_response",
+    "output_filename": "tech_stack_recommendations",
+    "output_formats": ["json", "docx", "md"]
+  },
+  "metadata": {
+    "id": "DE-07",
+    "version": "1.0.0",
+    "status": "draft",
+    "last_updated": "2026-05-18",
+    "created_by": "ADLC Config Generator",
+    "description": "Evaluates architecture and NFR specifications to recommend optimal technology stack with cost estimates and cloud deployment options"
+  }
+}

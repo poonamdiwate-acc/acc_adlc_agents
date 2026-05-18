@@ -202,7 +202,7 @@ def _make_handler(endpoint: str):
                     else:
                         payload.update(parsed)
                 else:
-                    # Read all files from subfolder (old behavior)
+                    # Read all files from subfolder (merges parsed content from multiple files)
                     folder_payload = await read_inputs(
                         base_path=base_path,
                         thread_id=x_thread_id,
@@ -212,6 +212,10 @@ def _make_handler(endpoint: str):
                         llm_config=llm_config,
                         allowed_extensions=extensions,
                     )
+                    
+                    # Always merge at top level - folder scans produce merged dicts
+                    # with keys like functional_requirements, nfr, etc.
+                    # The field_name is for single-file sources only
                     payload.update(folder_payload)
         except ValueError as exc:
             raise HTTPException(
@@ -265,47 +269,37 @@ def _make_handler(endpoint: str):
                     "Could not write to shared folder: agent=%s thread=%s err=%s",
                     entry.agent_id, x_thread_id, exc,
                 )
-            # When JSON is requested, also write companion formats for human viewing
-            # DE-04 (API Contracts): Write both JSON + DOCX
-            # Other agents: Write JSON + HTML
-            # Best-effort — never block the response on render/IO failures.
-            if fmt == "json":
-                companion_format = "docx" if entry.agent_id == "DE-04" else "html"
-                try:
-                    write_output(
-                        base_path=base_path,
-                        thread_id=x_thread_id,
-                        output_subfolder=output_subfolder,
-                        agent_id=entry.agent_id,
-                        result=result,
-                        output_format=companion_format,
-                        output_filename=output_filename,
-                    )
-                except Exception as exc:
-                    logger.info(
-                        "%s companion not written (skipped): agent=%s "
-                        "thread=%s err=%s",
-                        companion_format.upper(), entry.agent_id, x_thread_id, exc,
-                    )
             
-            # DE-04: When DOCX is requested, also write JSON for downstream agents
-            elif fmt == "docx" and entry.agent_id == "DE-04":
-                try:
-                    write_output(
-                        base_path=base_path,
-                        thread_id=x_thread_id,
-                        output_subfolder=output_subfolder,
-                        agent_id=entry.agent_id,
-                        result=result,
-                        output_format="json",
-                        output_filename=output_filename,
-                    )
-                except Exception as exc:
-                    logger.info(
-                        "JSON companion not written (skipped): agent=%s "
-                        "thread=%s err=%s",
-                        entry.agent_id, x_thread_id, exc,
-                    )
+            # When JSON is requested, also write companion formats for human viewing
+            # Read output_formats from agent config to determine which formats to generate
+            if fmt == "json":
+                agent_config = cfg.agent_config(entry.agent_id)
+                configured_formats = agent_config.get("shared_io", {}).get("output_formats", [])
+                
+                # Write all configured formats except JSON (already written)
+                companion_formats = [f for f in configured_formats if f.lower() not in ["json"]]
+                
+                # Fallback to legacy behavior if no config
+                if not companion_formats:
+                    companion_formats = ["docx"] if entry.agent_id == "DE-04" else ["html"]
+                
+                for companion_fmt in companion_formats:
+                    try:
+                        write_output(
+                            base_path=base_path,
+                            thread_id=x_thread_id,
+                            output_subfolder=output_subfolder,
+                            agent_id=entry.agent_id,
+                            result=result,
+                            output_format=companion_fmt,
+                            output_filename=output_filename,
+                        )
+                    except Exception as exc:
+                        logger.info(
+                            "%s companion not written (skipped): agent=%s "
+                            "thread=%s err=%s",
+                            companion_fmt.upper(), entry.agent_id, x_thread_id, exc,
+                        )
 
         # --- HTTP response ---
         if fmt == "json":

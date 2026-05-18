@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Type
 
+import httpx
 from google import genai
 from google.genai import types as genai_types
 from google.genai.errors import APIError, ClientError, ServerError
@@ -59,16 +60,42 @@ class LLMClient:
         self,
         project: Optional[str] = None,
         location: Optional[str] = None,
+        verify_ssl: bool = True,
     ) -> None:
         # project / location default to GOOGLE_CLOUD_PROJECT and
         # GOOGLE_CLOUD_LOCATION when None. Retry policy lives in this class,
         # so SDK-level retries stay at their default (we control attempts via
         # retry_attempts in the merged llm_config).
-        self._client = genai.Client(
-            vertexai=True,
-            project=project,
-            location=location,
-        )
+        
+        # Check environment variable for SSL verification override
+        if os.getenv("DISABLE_SSL_VERIFY", "").lower() in ("true", "1", "yes"):
+            verify_ssl = False
+            logger.warning(
+                "SSL verification DISABLED via DISABLE_SSL_VERIFY env variable. "
+                "This should only be used in development/corporate networks."
+            )
+        
+        # Configure httpx client with SSL settings
+        http_client = None
+        if not verify_ssl:
+            http_client = httpx.AsyncClient(verify=False)
+            logger.warning("SSL certificate verification is DISABLED")
+        
+        # Create genai client with custom http_client
+        if http_client:
+            # Pass httpx client via api_client parameter
+            self._client = genai.Client(
+                vertexai=True,
+                project=project,
+                location=location,
+                http_options=httpx.AsyncClient(verify=False),
+            )
+        else:
+            self._client = genai.Client(
+                vertexai=True,
+                project=project,
+                location=location,
+            )
 
     async def call(
         self,

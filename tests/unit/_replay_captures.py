@@ -44,6 +44,11 @@ from agents.de04_api_contracts import output_parser as de04_parser  # noqa: E402
 from core.config_loader import get_config  # noqa: E402
 from core.exceptions import OutputParseError  # noqa: E402
 
+try:
+    from agents.de07_technology_selection import output_parser as de07_parser  # noqa: E402
+except ImportError:
+    de07_parser = None  # type: ignore[assignment]
+
 
 def _parse_extraction(text: str) -> dict:
     """Mirror the JSON-loading logic in core.format_handler._llm_extract."""
@@ -99,15 +104,27 @@ def _parse_de04_output(text: str) -> dict:
     }
 
 
+def _parse_de07_output(text: str) -> dict:
+    """Run captured text through the DE-07 output_parser."""
+    if de07_parser is None:
+        raise RuntimeError("DE-07 parser not importable in this environment")
+    parsed = de07_parser.parse(text)
+    return {"top_level_keys": sorted(parsed.keys())}
+
+
 def _pick_parser(filename: str):
     if filename.startswith("DE-03-input-extraction__"):
         return "format_handler.extract", _parse_extraction
     if filename.startswith("DE-04-input-extraction__"):
         return "format_handler.extract", _parse_extraction
+    if filename.startswith("DE-07-input-extraction__"):
+        return "format_handler.extract", _parse_extraction
     if filename.startswith("DE-03__"):
         return "de03.output_parser", _parse_de03_output
     if filename.startswith("DE-04__"):
         return "de04.output_parser", _parse_de04_output
+    if filename.startswith("DE-07__"):
+        return "de07.output_parser", _parse_de07_output
     return None, None
 
 
