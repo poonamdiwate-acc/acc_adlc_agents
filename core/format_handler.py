@@ -430,6 +430,7 @@ placeholders.
 
 _AGENT_EXTRACTION_PROMPTS: Dict[str, str] = {
     "AD-04": _AD04_EXTRACTION_PROMPT,
+    "PL-01": _AD04_EXTRACTION_PROMPT,  # Gap detection uses same extraction as AD-04
     "DE-03": _DE03_EXTRACTION_PROMPT,
     "DE-04": _DE04_EXTRACTION_PROMPT,
 }

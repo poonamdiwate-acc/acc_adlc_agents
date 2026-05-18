@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ agent_id }} - FinOps Architect Activation Report ({{ run_id }})</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            color: #1a1a1a;
+            line-height: 1.55;
+        }
+        h1 { color: #1a365d; border-bottom: 3px solid #2b6cb0; padding-bottom: 0.5rem; }
+        h2 { color: #2d3748; margin-top: 2.2rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; }
+        h3 { color: #4a5568; margin-top: 1.5rem; }
+        .meta { color: #718096; font-size: 0.9rem; margin-bottom: 2rem; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .summary-card {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .summary-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2b6cb0;
+        }
+        .summary-card .label {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-top: 0.3rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+        th { background: #edf2f7; font-weight: 600; }
+        tr:nth-child(even) { background: #f7fafc; }
+        .zone-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .zone-proceed { background: #c6f6d5; color: #22543d; }
+        .zone-pivot { background: #fefcbf; color: #744210; }
+        .zone-stop { background: #fed7d7; color: #742a2a; }
+        .status-activated { background: #c6f6d5; color: #22543d; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <h1>PL-05 · FinOps Architect — Activation Report</h1>
+    <p class="meta">
+        Run ID: <code>{{ run_id }}</code> |
+        Generated: {{ activation_summary.get("activated_at", "N/A") if activation_summary else "N/A" }}
+    </p>
+
+    {% if activation_summary %}
+    <h2>Activation Status</h2>
+    <p><span class="status-activated">{{ activation_summary.status | upper }}</span></p>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="value">{{ activation_summary.project_name or "—" }}</div>
+            <div class="label">Project</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ activation_summary.currency or "INR" }} {{ "{:,.0f}".format(activation_summary.total_budget or 0) }}</div>
+            <div class="label">Total Budget ({{ activation_summary.period or "—" }})</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ activation_summary.currency or "INR" }} {{ "{:,.0f}".format(activation_summary.per_day_max_spend or 0) }}</div>
+            <div class="label">Daily Max Spend</div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if budget_allocation_plan %}
+    <h2>Budget Allocation Plan</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Resource Type</th>
+                <th>Envelope ({{ budget_allocation_plan.currency or "INR" }})</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Compute</td><td>{{ "{:,.2f}".format(budget_allocation_plan.compute_envelope or 0) }}</td></tr>
+            <tr><td>Storage</td><td>{{ "{:,.2f}".format(budget_allocation_plan.storage_envelope or 0) }}</td></tr>
+            <tr><td>Network</td><td>{{ "{:,.2f}".format(budget_allocation_plan.network_envelope or 0) }}</td></tr>
+            <tr><td>Managed Services</td><td>{{ "{:,.2f}".format(budget_allocation_plan.managed_services_envelope or 0) }}</td></tr>
+            <tr><td>Reserve Buffer</td><td>{{ "{:,.2f}".format(budget_allocation_plan.reserve_buffer or 0) }}</td></tr>
+            <tr style="font-weight: 700;"><td>Total</td><td>{{ "{:,.2f}".format(budget_allocation_plan.total_budget or 0) }}</td></tr>
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if pps_threshold_config %}
+    <h2>PPS Threshold Configuration</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Zone</th>
+                <th>Threshold (%)</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="zone-badge zone-proceed">Proceed</span></td>
+                <td>0% — {{ pps_threshold_config.proceed_ceiling_pct }}%</td>
+                <td>Normal operations. Status reports published.</td>
+            </tr>
+            <tr>
+                <td><span class="zone-badge zone-pivot">Pivot</span></td>
+                <td>{{ pps_threshold_config.proceed_ceiling_pct }}% — {{ pps_threshold_config.pivot_ceiling_pct }}%</td>
+                <td>Spend freeze. Reallocation proposals generated.</td>
+            </tr>
+            <tr>
+                <td><span class="zone-badge zone-stop">Stop</span></td>
+                <td>≥ {{ pps_threshold_config.stop_trigger_pct }}%</td>
+                <td>Hard block applied. Emergency escalation.</td>
+            </tr>
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if forecast_baseline %}
+    <h2>Forecast Baseline</h2>
+    <div class="summary-grid">
+        {% if forecast_baseline.projected_eom_spend %}
+        <div class="summary-card">
+            <div class="value">{{ "{:,.0f}".format(forecast_baseline.projected_eom_spend) }}</div>
+            <div class="label">Projected EOM Spend</div>
+        </div>
+        {% endif %}
+        {% if forecast_baseline.projected_eom_pct_of_budget %}
+        <div class="summary-card">
+            <div class="value">{{ forecast_baseline.projected_eom_pct_of_budget }}%</div>
+            <div class="label">% of Budget</div>
+        </div>
+        {% endif %}
+        {% if forecast_baseline.forecast_confidence_pct %}
+        <div class="summary-card">
+            <div class="value">{{ forecast_baseline.forecast_confidence_pct }}%</div>
+            <div class="label">Forecast Confidence</div>
+        </div>
+        {% endif %}
+        {% if forecast_baseline.model_basis %}
+        <div class="summary-card">
+            <div class="value">{{ forecast_baseline.model_basis }}</div>
+            <div class="label">Model Basis</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if project_config_record %}
+    <h2>Project Config Record</h2>
+    <table>
+        <tbody>
+            <tr><th>Project ID</th><td>{{ project_config_record.project_id or "—" }}</td></tr>
+            <tr><th>Project Name</th><td>{{ project_config_record.project_name or "—" }}</td></tr>
+            <tr><th>Owner</th><td>{{ project_config_record.owner or "—" }}</td></tr>
+            <tr><th>Cost Centre</th><td>{{ project_config_record.cost_centre_code or "—" }}</td></tr>
+            <tr><th>Business Unit</th><td>{{ project_config_record.business_unit or "—" }}</td></tr>
+            <tr><th>Budget Envelope</th><td>{{ project_config_record.currency or "INR" }} {{ "{:,.2f}".format(project_config_record.budget_envelope or 0) }}</td></tr>
+            <tr><th>Activated At</th><td>{{ project_config_record.activated_at or "—" }}</td></tr>
+        </tbody>
+    </table>
+
+    {% if project_config_record.approval_chain %}
+    <h3>Approval Chain</h3>
+    <table>
+        <thead>
+            <tr><th>Level</th><th>Role</th><th>Contact</th><th>SLA (hours)</th></tr>
+        </thead>
+        <tbody>
+            {% for approver in project_config_record.approval_chain %}
+            <tr>
+                <td>{{ approver.level or loop.index }}</td>
+                <td>{{ approver.role or "—" }}</td>
+                <td>{{ approver.contact or approver.email or "—" }}</td>
+                <td>{{ approver.response_sla_hours or "—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+    {% endif %}
+
+</body>
+</html>

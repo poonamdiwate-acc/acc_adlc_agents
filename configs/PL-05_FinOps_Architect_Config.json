@@ -1,0 +1,435 @@
+{
+  "agent": {
+    "id": "PL-05",
+    "name": "FinOps Architect",
+    "version": "1.0.0",
+    "phase": "plan",
+    "endpoint": "/agents/finops-architect",
+    "mcp_tool_name": "run_finops_architect",
+    "skill_file": "PL-05_FinOps_Architect_SKILL.md"
+  },
+  "llm_config_override": {
+    "max_tokens": 16384,
+    "timeout_seconds": 30
+  },
+  "behaviour": {
+
+    "on_missing_project_identity":       "stop_and_report",
+    "on_missing_budget_definition":      "stop_and_report",
+    "on_missing_pps_thresholds":         "stop_and_report",
+    "on_missing_financial_guardrails":   "stop_and_report",
+    "on_missing_approval_chain":         "stop_and_report",
+    "on_missing_cloud_spend_feed":       "stop_and_report",
+    "on_missing_resource_profile":       "stop_and_report",
+    "on_missing_historical_spend":       "proceed_with_baseline_model",
+    "on_missing_resource_sub_limits":    "proceed_without",
+    "on_missing_pricing_data":           "warn_and_use_last_known_rates",
+    "on_invalid_budget_split":           "stop_and_report",
+    "on_invalid_pps_order":              "stop_and_report",
+    "on_stale_cloud_data":               "pause_alerts_and_warn",
+    "on_untagged_resources_detected":    "apply_guardrail_action",
+    "on_zone_transition":                "fire_threshold_alert",
+    "on_sub_limit_breach":               "fire_threshold_alert",
+    "on_daily_spike_detected":           "fire_threshold_alert",
+    "on_pivot_zone_entry":               "generate_reallocation_proposal",
+    "on_stop_zone_entry":                "apply_hard_block_and_escalate",
+    "on_reallocation_approved":          "update_budget_envelope_and_recalculate",
+    "on_reallocation_rejected":          "hold_position_and_notify_owner",
+    "on_approval_sla_breached":          "re_escalate_to_next_level",
+    "on_forecast_variance_high":         "flag_for_model_retraining",
+    "on_no_zone_breach":                 "publish_spend_status_report",
+    "on_clean_tag_compliance":           "log_and_continue",
+    "on_activation_success":             "write_project_config_record_and_begin_monitoring",
+
+    "min_approval_chain_levels":         2,
+    "max_data_freshness_hours":          24,
+    "default_proceed_ceiling_pct":       70,
+    "default_pivot_ceiling_pct":         90,
+    "default_stop_trigger_pct":          90,
+    "default_reserve_buffer_pct":        5,
+    "min_reserve_buffer_pct":            5,
+    "forecast_retraining_variance_pct":  15,
+
+    "zone_transitions": [
+      "none_to_proceed",
+      "proceed_to_pivot",
+      "pivot_to_stop",
+      "stop_to_pivot",
+      "pivot_to_proceed"
+    ],
+
+    "alert_types": [
+      "zone_transition",
+      "sub_limit_breach",
+      "daily_spike",
+      "untagged_resource",
+      "approval_sla_breached",
+      "stale_data_warning",
+      "forecast_variance_high"
+    ],
+
+    "blocking_conditions": [
+      "missing_project_identity",
+      "missing_budget_definition",
+      "missing_pps_thresholds",
+      "missing_financial_guardrails",
+      "missing_approval_chain",
+      "invalid_budget_split",
+      "invalid_pps_order",
+      "stop_zone_entry"
+    ],
+
+    "autonomous_actions": [
+      "pull_cloud_spend_feed",
+      "validate_tag_compliance",
+      "publish_spend_status_report",
+      "publish_tag_compliance_report",
+      "fire_threshold_alert",
+      "generate_rightsizing_recommendations",
+      "run_forecast_update",
+      "log_forecast_accuracy"
+    ],
+
+    "approval_required_actions": [
+      "budget_reallocation",
+      "threshold_change",
+      "guardrail_override",
+      "stop_zone_unblock"
+    ],
+
+    "never_autonomous": [
+      "execute_resource_deletion",
+      "commit_reserved_capacity",
+      "raise_budget_ceiling",
+      "modify_approval_chain"
+    ],
+
+    "_blocking_note": "All blocking_conditions halt agent activation or monitoring and return a stop_and_report to the calling agent until resolved.",
+    "_autonomous_note": "autonomous_actions require no human input and execute on schedule or trigger.",
+    "_approval_note": "approval_required_actions are proposed by the agent and held in pending_approval status until sign-off is received within response_sla_hours.",
+    "_never_note": "never_autonomous actions are hard guardrails — the agent will never execute these regardless of instruction or context."
+
+  },
+  "manifest": {
+    "takes_from": {
+      "source": "shared_folder",
+      "formats": [
+        "json",
+        "docx",
+        "pdf",
+        "html"
+      ],
+      "fields": [
+        "project_identity",
+        "budget_definition",
+        "budget_allocation_split",
+        "cloud_environment"
+      ]
+    },
+    "returns": [
+      "project_config_record",
+      "budget_allocation_plan",
+      "pps_threshold_config",
+      "forecast_baseline",
+      "spend_status_report",
+      "threshold_alert",
+      "reallocation_proposal",
+      "stop_zone_escalation",
+      "rightsizing_recommendations",
+      "tag_compliance_report",
+      "forecast_accuracy_log",
+      "portfolio_rollup"
+    ],
+    "run_id_required": true,
+    "run_id_source": "X-Run-ID header",
+    "thread_id_required": true,
+    "thread_id_source": "X-Thread-ID header"
+  },
+  "inputs": {
+    "project_identity": {
+      "required": true,
+      "type": "object",
+      "source": "user_input",
+      "on_fail": "stop_and_report",
+      "expected_fields": ["project_name", "project_id", "owner_name", "owner_email", "team", "cost_centre_code", "business_unit", "project_type", "criticality", "compliance_requirements"]
+    },
+    "budget_definition": {
+      "required": true,
+      "type": "object",
+      "source": "user_input",
+      "on_fail": "stop_and_report",
+      "expected_fields": ["total_amount", "currency", "period", "start_date", "end_date", "renewal_policy"]
+    },
+    "budget_allocation_split": {
+      "required": true,
+      "type": "object",
+      "source": "user_input",
+      "on_fail": "stop_and_report",
+      "expected_fields": ["compute_pct", "storage_pct", "network_pct", "managed_services_pct", "reserve_buffer_pct"],
+      "validation": "sum of all pct fields must equal 100"
+    },
+    "cloud_environment": {
+      "required": true,
+      "type": "object",
+      "source": "user_input",
+      "on_fail": "stop_and_report",
+      "expected_fields": ["cloud_provider", "account_id", "primary_region", "environment_tag", "purchase_types_allowed"]
+    }
+  },
+  "outputs": {
+
+  "project_config_record": {
+    "type": "object",
+    "description": "The activated master configuration record for a project, written once to the project registry and loaded by all agent tools at runtime to resolve budget, threshold, and guardrail context.",
+    "schema": {
+      "project_id":           { "type": "string" },
+      "project_name":         { "type": "string" },
+      "owner":                { "type": "string" },
+      "cost_centre_code":     { "type": "string" },
+      "budget_envelope":      { "type": "number", "unit": "currency" },
+      "allocation_split":     { "type": "object" },
+      "pps_thresholds":       { "type": "object" },
+      "financial_guardrails": { "type": "object" },
+      "approval_chain":       { "type": "array" },
+      "alert_config":         { "type": "object" },
+      "activated_at":         { "type": "datetime" },
+      "activated_by":         { "type": "string" }
+    }
+  },
+
+  "budget_allocation_plan": {
+    "type": "object",
+    "description": "The computed breakdown of a project's total budget into per-resource-type envelopes and a daily spend ceiling, generated by the Budget Modeler on activation and used by the Threshold Engine and Forecast Tool at runtime.",
+    "schema": {
+      "project_id":                  { "type": "string" },
+      "total_budget":                { "type": "number", "unit": "currency" },
+      "currency":                    { "type": "string", "enum": ["INR", "USD", "EUR", "GBP", "SGD"] },
+      "period":                      { "type": "string", "enum": ["monthly", "quarterly", "half_yearly", "annual", "fixed"] },
+      "compute_envelope":            { "type": "number", "unit": "currency" },
+      "storage_envelope":            { "type": "number", "unit": "currency" },
+      "network_envelope":            { "type": "number", "unit": "currency" },
+      "managed_services_envelope":   { "type": "number", "unit": "currency" },
+      "reserve_buffer":              { "type": "number", "unit": "currency" },
+      "per_day_max_spend":           { "type": "number", "unit": "currency" },
+      "allocation_generated_at":     { "type": "datetime" }
+    }
+  },
+
+  "pps_threshold_config": {
+    "type": "object",
+    "description": "The resolved Proceed, Pivot, and Stop zone boundaries for a project, expressed as both percentages and absolute currency amounts, activated into the Threshold Engine to drive all zone transitions, alerts, and spend controls at runtime.",
+    "schema": {
+      "project_id":                        { "type": "string" },
+      "proceed_ceiling_pct":               { "type": "number", "unit": "percent" },
+      "proceed_ceiling_amount":            { "type": "number", "unit": "currency" },
+      "proceed_reporting_frequency":       { "type": "string", "enum": ["daily", "weekly", "anomaly_only"] },
+      "proceed_rightsizing_trigger_pct":   { "type": "number", "unit": "percent" },
+      "proceed_notify_on_entry":           { "type": "string", "enum": ["none", "owner_only", "full_team"] },
+      "pivot_ceiling_pct":                 { "type": "number", "unit": "percent" },
+      "pivot_ceiling_amount":              { "type": "number", "unit": "currency" },
+      "pivot_spend_freeze_scope":          { "type": "string", "enum": ["new_resource_types", "non_critical", "full_freeze"] },
+      "pivot_approval_threshold":          { "type": "number", "unit": "currency" },
+      "pivot_reallocation_allowed":        { "type": "boolean" },
+      "pivot_escalation_contact":          { "type": "string", "format": "email" },
+      "pivot_response_sla_hours":          { "type": "number", "unit": "hours" },
+      "stop_trigger_pct":                  { "type": "number", "unit": "percent" },
+      "stop_trigger_amount":               { "type": "number", "unit": "currency" },
+      "stop_hard_block_scope":             { "type": "string", "enum": ["new_provisioning", "all_new_spend", "full_account_lock"] },
+      "stop_emergency_pool":               { "type": "string" },
+      "stop_override_authority":           { "type": "string", "enum": ["finops_architect", "cto", "cfo", "cfo_and_cto"] },
+      "stop_escalation_contact":           { "type": "string", "format": "email" },
+      "stop_response_sla_hours":           { "type": "number", "unit": "hours" }
+    }
+  },
+
+  "forecast_baseline": {
+    "type": "object",
+    "description": "The initial burn curve and end-of-period spend projection for a project, generated by the Forecast Tool on activation using resource profile and historical data, establishing the baseline against which all future spend deviations are measured.",
+    "schema": {
+      "project_id":                  { "type": "string" },
+      "burn_curve":                  { "type": "array", "items": { "date": "date", "projected_spend": "number" } },
+      "projected_eom_spend":         { "type": "number", "unit": "currency" },
+      "projected_eom_pct_of_budget": { "type": "number", "unit": "percent" },
+      "days_to_pivot_zone":          { "type": "number", "unit": "days" },
+      "days_to_stop_zone":           { "type": "number", "unit": "days" },
+      "forecast_confidence_pct":     { "type": "number", "unit": "percent" },
+      "generated_at":                { "type": "datetime" },
+      "model_basis":                 { "type": "string", "enum": ["historical_data", "baseline_estimate"] }
+    }
+  },
+
+  "spend_status_report": {
+    "type": "object",
+    "description": "A scheduled snapshot of a project's current spend position, burn rate, zone status, and top cost drivers, published to the FinOps Dashboard to give the project owner and architect a real-time view of budget health.",
+    "schema": {
+      "project_id":               { "type": "string" },
+      "report_date":              { "type": "date" },
+      "current_zone":             { "type": "string", "enum": ["proceed", "pivot", "stop"] },
+      "total_spent_to_date":      { "type": "number", "unit": "currency" },
+      "pct_of_budget_consumed":   { "type": "number", "unit": "percent" },
+      "spend_by_resource_type":   { "type": "object", "keys": ["compute", "storage", "network", "managed_services"] },
+      "top_3_cost_drivers":       { "type": "array", "items": { "resource_id": "string", "cost": "number" } },
+      "daily_burn_rate":          { "type": "number", "unit": "currency_per_day" },
+      "projected_eom_spend":      { "type": "number", "unit": "currency" },
+      "days_remaining_in_period": { "type": "number", "unit": "days" },
+      "budget_remaining":         { "type": "number", "unit": "currency" },
+      "untagged_resource_count":  { "type": "integer" },
+      "rightsizing_opportunities":{ "type": "integer" }
+    }
+  },
+
+  "threshold_alert": {
+    "type": "object",
+    "description": "A real-time notification fired by the Threshold Engine when a project crosses a zone boundary or breaches a resource-type sub-limit, carrying the trigger context, recommended action, and escalation contact to the configured alert destination.",
+    "schema": {
+      "project_id":           { "type": "string" },
+      "alert_id":             { "type": "string", "format": "uuid" },
+      "alert_type":           { "type": "string", "enum": ["zone_transition", "sub_limit_breach", "daily_spike", "untagged_resource"] },
+      "triggered_at":         { "type": "datetime" },
+      "previous_zone":        { "type": "string", "enum": ["proceed", "pivot", "stop", "none"] },
+      "current_zone":         { "type": "string", "enum": ["proceed", "pivot", "stop"] },
+      "pct_consumed":         { "type": "number", "unit": "percent" },
+      "amount_consumed":      { "type": "number", "unit": "currency" },
+      "budget_remaining":     { "type": "number", "unit": "currency" },
+      "breach_resource_type": { "type": "string", "enum": ["compute", "storage", "network", "managed_services", "overall"] },
+      "top_cost_drivers":     { "type": "array", "items": { "resource_id": "string", "cost": "number" } },
+      "recommended_action":   { "type": "string" },
+      "escalation_contact":   { "type": "string", "format": "email" },
+      "response_sla_hours":   { "type": "number", "unit": "hours" }
+    }
+  },
+
+  "reallocation_proposal": {
+    "type": "object",
+    "description": "An agent-generated proposal to shift budget from an identified source to a project entering the Pivot zone, routed to the Level 1 approver for sign-off before any reallocation is executed.",
+    "schema": {
+      "project_id":                        { "type": "string" },
+      "proposal_id":                       { "type": "string", "format": "uuid" },
+      "triggered_at":                      { "type": "datetime" },
+      "current_spend":                     { "type": "number", "unit": "currency" },
+      "current_zone":                      { "type": "string", "enum": ["pivot", "stop"] },
+      "proposed_reallocation_from":        { "type": "string" },
+      "proposed_reallocation_amount":      { "type": "number", "unit": "currency" },
+      "rationale":                         { "type": "string" },
+      "projected_zone_after_reallocation": { "type": "string", "enum": ["proceed", "pivot"] },
+      "approval_required_from":            { "type": "string", "format": "email" },
+      "response_sla_hours":                { "type": "number", "unit": "hours" },
+      "status":                            { "type": "string", "enum": ["pending_approval", "approved", "rejected", "expired"] }
+    }
+  },
+
+  "stop_zone_escalation": {
+    "type": "object",
+    "description": "An immediate escalation package fired when a project hits the Stop zone, containing the hard block confirmation, root cause summary, and reallocation amount needed, routed simultaneously to Level 2 and Level 3 approvers for emergency override.",
+    "schema": {
+      "project_id":                  { "type": "string" },
+      "escalation_id":               { "type": "string", "format": "uuid" },
+      "triggered_at":                { "type": "datetime" },
+      "total_spent":                 { "type": "number", "unit": "currency" },
+      "pct_consumed":                { "type": "number", "unit": "percent" },
+      "hard_block_applied":          { "type": "boolean" },
+      "blocked_resource_types":      { "type": "array", "items": { "type": "string" } },
+      "root_cause_summary":          { "type": "string" },
+      "top_5_cost_drivers":          { "type": "array", "items": { "resource_id": "string", "cost": "number" } },
+      "emergency_reallocation_pool": { "type": "string" },
+      "reallocation_amount_needed":  { "type": "number", "unit": "currency" },
+      "override_authority":          { "type": "string", "enum": ["finops_architect", "cto", "cfo", "cfo_and_cto"] },
+      "response_sla_hours":          { "type": "number", "unit": "hours" }
+    }
+  },
+
+  "rightsizing_recommendations": {
+    "type": "array",
+    "description": "An agent-generated list of oversized or underutilised resources within a project, each with a recommended action and estimated monthly saving, surfaced to the project owner and FinOps Dashboard for review and manual execution.",
+    "item_schema": {
+      "project_id":             { "type": "string" },
+      "resource_id":            { "type": "string" },
+      "resource_type":          { "type": "string", "enum": ["compute", "storage", "database", "managed_service"] },
+      "current_size":           { "type": "string" },
+      "recommended_size":       { "type": "string" },
+      "current_monthly_cost":   { "type": "number", "unit": "currency" },
+      "projected_monthly_cost": { "type": "number", "unit": "currency" },
+      "estimated_saving":       { "type": "number", "unit": "currency" },
+      "utilisation_avg_pct":    { "type": "number", "unit": "percent" },
+      "confidence_pct":         { "type": "number", "unit": "percent" },
+      "action_required":        { "type": "string", "enum": ["resize", "terminate", "schedule_off_hours"] }
+    }
+  },
+
+  "tag_compliance_report": {
+    "type": "object",
+    "description": "A daily audit of resource tagging adherence within a project, listing non-compliant resources, missing tag keys, and the untagged spend amount, with the action taken recorded based on the guardrail configuration.",
+    "schema": {
+      "project_id":              { "type": "string" },
+      "report_date":             { "type": "date" },
+      "total_resources":         { "type": "integer" },
+      "compliant_resources":     { "type": "integer" },
+      "non_compliant_resources": { "type": "integer" },
+      "non_compliant_list":      { "type": "array", "items": { "resource_id": "string", "missing_tags": "array" } },
+      "missing_tag_keys":        { "type": "array", "items": { "type": "string" } },
+      "untagged_spend_amount":   { "type": "number", "unit": "currency" },
+      "action_taken":            { "type": "string", "enum": ["alert_only", "block_provisioning", "auto_tagged"] }
+    }
+  },
+
+  "forecast_accuracy_log": {
+    "type": "array",
+    "description": "An end-of-period record comparing the Forecast Tool's predicted spend against actual spend for a project, used to measure model accuracy and trigger retraining when variance exceeds acceptable thresholds.",
+    "item_schema": {
+      "project_id":      { "type": "string" },
+      "period":          { "type": "string" },
+      "predicted_spend": { "type": "number", "unit": "currency" },
+      "actual_spend":    { "type": "number", "unit": "currency" },
+      "variance_amount": { "type": "number", "unit": "currency" },
+      "variance_pct":    { "type": "number", "unit": "percent" },
+      "model_basis":     { "type": "string", "enum": ["historical_data", "baseline_estimate"] },
+      "accuracy_rating": { "type": "string", "enum": ["good", "acceptable", "needs_retraining"] }
+    }
+  },
+
+  "portfolio_rollup": {
+    "type": "object",
+    "description": "A weekly cross-project summary for the FinOps architect showing total budget health, zone distribution across all projects, top overspend and underspend projects, and portfolio-wide rightsizing savings available.",
+    "schema": {
+      "report_date":                          { "type": "date" },
+      "total_projects":                       { "type": "integer" },
+      "projects_in_proceed":                  { "type": "integer" },
+      "projects_in_pivot":                    { "type": "integer" },
+      "projects_in_stop":                     { "type": "integer" },
+      "total_budget_across_projects":         { "type": "number", "unit": "currency" },
+      "total_spend_to_date":                  { "type": "number", "unit": "currency" },
+      "total_budget_remaining":               { "type": "number", "unit": "currency" },
+      "top_3_overspend_projects":             { "type": "array", "items": { "project_id": "string", "pct_consumed": "number" } },
+      "top_3_underspend_projects":            { "type": "array", "items": { "project_id": "string", "pct_consumed": "number" } },
+      "total_rightsizing_savings_available":  { "type": "number", "unit": "currency" },
+      "total_untagged_spend":                 { "type": "number", "unit": "currency" }
+    }
+  }
+
+},
+  "supported_formats": {
+    "input": [
+      "json",
+      "docx",
+      "pdf",
+      "html"
+    ],
+    "output": [
+      "json",
+      "docx",
+      "pdf",
+      "html"
+    ],
+    "default_output": "docx"
+  },
+  "shared_io": {
+    "input_subfolder": "finops_docs",
+    "output_subfolder": "finops_architect_response"
+  },
+  "metadata": {
+    "id": "PL-05",
+    "version": "1.0.0",
+    "status": "draft",
+    "last_updated": "2026-05-18"
+  }
+}
