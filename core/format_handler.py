@@ -168,11 +168,12 @@ async def _llm_extract(
     extraction_prompt = _build_extraction_prompt(doc, agent_id)
 
     extraction_config = dict(llm_config or {})
+    # Use 65536 (64K) tokens for input extraction to handle large documents
     extraction_config["max_tokens"] = max(
-        extraction_config.get("max_tokens", 8192), 32768
+        extraction_config.get("max_tokens", 8192), 65536
     )
     extraction_config["timeout_seconds"] = max(
-        extraction_config.get("timeout_seconds", 60), 180
+        extraction_config.get("timeout_seconds", 60), 240
     )
     extraction_config.pop("response_format", None)
 
