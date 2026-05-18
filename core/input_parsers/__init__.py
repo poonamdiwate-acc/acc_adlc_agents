@@ -10,6 +10,7 @@ from core.input_parsers.docx_parser import DocxParser
 from core.input_parsers.pdf_parser import PdfParser
 from core.input_parsers.html_parser import HtmlParser
 from core.input_parsers.json_parser import JsonParser
+from core.input_parsers.markdown_parser import MarkdownParser
 
 __all__ = [
     "InputParser",
@@ -18,4 +19,5 @@ __all__ = [
     "PdfParser",
     "HtmlParser",
     "JsonParser",
+    "MarkdownParser",
 ]

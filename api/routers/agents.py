@@ -37,9 +37,10 @@ from core.exceptions import (
 )
 from core.format_handler import (
     SUPPORTED_OUTPUT_FORMATS,
+    parse_input,
     render_output,
 )
-from core.shared_folder import read_inputs, write_output
+from core.shared_folder import read_inputs, write_output, find_file_by_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -90,28 +91,40 @@ def _make_handler(endpoint: str):
         shared_io = cfg.shared_io_config(entry.agent_id)
 
         base_path = shared_cfg.get("base_path", "")
-        # Support both single input_subfolder and array input_subfolders
-        input_subfolder = shared_io.get("input_subfolder")
-        input_subfolders = shared_io.get("input_subfolders")
         
-        if input_subfolders:
-            # Array of subfolders (e.g., DE-04)
-            input_folders_list = input_subfolders if isinstance(input_subfolders, list) else [input_subfolders]
-        elif input_subfolder:
-            # Single subfolder (e.g., AD-04, DE-03)
-            input_folders_list = [input_subfolder]
+        # Support NEW input_sources pattern (with file name search) or OLD input_subfolders pattern
+        input_sources = shared_io.get("input_sources")
+        
+        if input_sources:
+            # NEW pattern: input_sources with file_name_patterns support
+            pass  # Will handle below
         else:
-            input_folders_list = []
+            # OLD pattern: input_subfolder or input_subfolders
+            input_subfolder = shared_io.get("input_subfolder")
+            input_subfolders = shared_io.get("input_subfolders")
+            
+            if input_subfolders:
+                input_folders_list = input_subfolders if isinstance(input_subfolders, list) else [input_subfolders]
+            elif input_subfolder:
+                input_folders_list = [input_subfolder]
+            else:
+                input_folders_list = []
+            
+            # Convert to input_sources format for unified handling
+            input_sources = [
+                {"subfolder": subfolder, "allowed_extensions": [".json"] if subfolder == "data_design_response" else None}
+                for subfolder in input_folders_list
+            ]
             
         output_subfolder = shared_io.get("output_subfolder", "")
         output_filename = shared_io.get("output_filename") or None
 
-        if not base_path or not input_folders_list:
+        if not base_path or not input_sources:
             raise HTTPException(
                 status_code=500,
                 detail={
                     "error": "server_misconfigured",
-                    "message": "shared_folder.base_path and shared_io.input_subfolder(s) must be configured",
+                    "message": "shared_folder.base_path and shared_io input sources must be configured",
                 },
             )
 
@@ -120,23 +133,86 @@ def _make_handler(endpoint: str):
             llm_client = LLMClient()
             llm_config = cfg.llm_config(entry.agent_id)
             
-            # Read from multiple folders and merge
+            # Read from all input sources and merge
             payload = {}
-            for subfolder in input_folders_list:
-                # data_design_response should only read JSON files (DE-03 output)
-                extensions = [".json"] if subfolder == "data_design_response" else None
+            for source in input_sources:
+                subfolder = source.get("subfolder", "bs_docs")
+                file_patterns = source.get("file_name_patterns")
+                required = source.get("required", False)
+                extensions = source.get("allowed_extensions")
+                field_name = source.get("field_name")
                 
-                folder_payload = await read_inputs(
-                    base_path=base_path,
-                    thread_id=x_thread_id,
-                    input_subfolder=subfolder,
-                    agent_id=entry.agent_id,
-                    llm_client=llm_client,
-                    llm_config=llm_config,
-                    allowed_extensions=extensions,
-                )
-                # Merge into main payload (later values override earlier ones)
-                payload.update(folder_payload)
+                if file_patterns:
+                    # Search for specific files by name
+                    file_path = find_file_by_patterns(
+                        base_path=base_path,
+                        thread_id=x_thread_id,
+                        subfolder=subfolder,
+                        file_name_patterns=file_patterns,
+                        allowed_extensions=extensions,
+                    )
+                    
+                    if not file_path:
+                        if required:
+                            raise HTTPException(
+                                status_code=400,
+                                detail={
+                                    "error": "required_file_missing",
+                                    "message": f"Required file not found: {file_patterns} in {subfolder}",
+                                    "patterns": file_patterns,
+                                    "subfolder": subfolder,
+                                },
+                            )
+                        else:
+                            logger.info(
+                                "Optional file not found: patterns=%s subfolder=%s thread=%s",
+                                file_patterns, subfolder, x_thread_id
+                            )
+                            continue
+                    
+                    # Parse the found file
+                    file_bytes = file_path.read_bytes()
+                    # Map extension to content type
+                    ext = file_path.suffix.lower()
+                    content_type_map = {
+                        ".json": "application/json",
+                        ".html": "text/html",
+                        ".htm": "text/html",
+                        ".md": "text/markdown",
+                        ".markdown": "text/markdown",
+                    }
+                    content_type = content_type_map.get(ext, "application/octet-stream")
+                    
+                    parsed = await parse_input(
+                        content=file_bytes,
+                        content_type=content_type,
+                        filename=file_path.name,
+                        agent_id=entry.agent_id,
+                        llm_client=llm_client,
+                        llm_config=llm_config,
+                    )
+                    
+                    # Store with field name if specified, otherwise merge
+                    if field_name:
+                        # For diagrams, store the raw text content
+                        if content_type in ["text/html", "text/markdown", "text/x-markdown"]:
+                            payload[field_name] = parsed.get("raw_text") or str(parsed)
+                        else:
+                            payload[field_name] = parsed
+                    else:
+                        payload.update(parsed)
+                else:
+                    # Read all files from subfolder (old behavior)
+                    folder_payload = await read_inputs(
+                        base_path=base_path,
+                        thread_id=x_thread_id,
+                        input_subfolder=subfolder,
+                        agent_id=entry.agent_id,
+                        llm_client=llm_client,
+                        llm_config=llm_config,
+                        allowed_extensions=extensions,
+                    )
+                    payload.update(folder_payload)
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,
