@@ -24,6 +24,7 @@ from core.input_parsers import (
     HtmlParser,
     InputParser,
     JsonParser,
+    MarkdownParser,
     ParsedDocument,
     PdfParser,
 )
@@ -47,6 +48,7 @@ _PARSERS: list[InputParser] = [
     DocxParser(),
     PdfParser(),
     HtmlParser(),
+    MarkdownParser(),
 ]
 
 _RENDERERS: Dict[str, OutputRenderer] = {
@@ -56,7 +58,7 @@ _RENDERERS: Dict[str, OutputRenderer] = {
     "html": HtmlRenderer(),
 }
 
-SUPPORTED_INPUT_FORMATS = ["json", "docx", "pdf", "html"]
+SUPPORTED_INPUT_FORMATS = ["json", "docx", "pdf", "html", "md"]
 SUPPORTED_OUTPUT_FORMATS = list(_RENDERERS.keys())
 
 
@@ -78,6 +80,8 @@ def get_parser_for_extension(filename: str) -> Optional[InputParser]:
         "pdf": PdfParser(),
         "html": HtmlParser(),
         "htm": HtmlParser(),
+        "md": MarkdownParser(),
+        "markdown": MarkdownParser(),
     }
     return ext_map.get(ext)
 

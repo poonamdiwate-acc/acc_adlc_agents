@@ -16,8 +16,8 @@ def build_user_message(payload: Dict[str, Any]) -> str:
     """Render the agent payload into the user message body.
     
     The shared folder merges all extracted fields flat into the payload.
-    We extract structured_requirements and data_model directly from the
-    payload and build the LLM input message.
+    We extract structured_requirements, data_model, agent diagrams, and 
+    architecture directly from the payload and build the LLM input message.
     """
     body = {
         "structured_requirements": payload.get("structured_requirements") or [],
@@ -29,5 +29,8 @@ def build_user_message(payload: Dict[str, Any]) -> str:
         "project_context": payload.get("project_context") or {},
         "business_case": payload.get("business_case") or "",
         "constraints": payload.get("constraints"),
+        "agent_interaction_diagram": payload.get("agent_interaction_diagram") or "",
+        "agent_network_diagram": payload.get("agent_network_diagram") or "",
+        "agent_architecture": payload.get("agent_architecture") or {},
     }
     return json.dumps(body, ensure_ascii=False, indent=2)

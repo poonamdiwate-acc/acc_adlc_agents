@@ -1,27 +1,29 @@
 <#
 .SYNOPSIS
     Local test script for DE-04 API Contracts Agent.
-    Reads inputs from TWO folders and writes to api_contracts_response.
+    Reads inputs from multiple sources and writes to api_contracts_response.
 
 .DESCRIPTION
     The API Contracts agent automatically reads from:
-    1. C:\SharedFolderAdlc\<ThreadId>\bs_docs\ - Business requirements
-    2. C:\SharedFolderAdlc\<ThreadId>\data_design_response\ - Data model from DE-03
+    1. C:\SharedFolderAdlc\<ThreadId>\bs_docs\ - Business requirements (.json/.docx/.pdf/.html)
+    2. C:\SharedFolderAdlc\<ThreadId>\Business_Process_Agent_Interaction.html/md - Agent interaction diagram (REQUIRED)
+    3. C:\SharedFolderAdlc\<ThreadId>\Business_Process_Agent_Network.html/md - Agent network diagram (optional)
+    4. C:\SharedFolderAdlc\<ThreadId>\brd_response\agent_architecture.json - Architecture (optional)
     
     It writes output to:
-    - C:\SharedFolderAdlc\<ThreadId>\api_contracts_response\
+    - C:\SharedFolderAdlc\<ThreadId>\api_contracts_response\api_contracts_design.json
+    - C:\SharedFolderAdlc\<ThreadId>\api_contracts_response\api_contracts_design.docx
 
 .USAGE
     # Step 1: Start server in a separate terminal:
     #   .\.venv\Scripts\python.exe run.py --host 127.0.0.1 --port 8080
 
-    # Step 2: Run DE-03 first to generate data design:
-    .\test_local_de03.ps1 -ThreadId "thr-005" -Port 8080
+    # Step 2: Ensure thread folder has required files (see test setup):
+    .\test_local_de04.ps1 -ThreadId "thr-test-de04-new" -Port 8080
 
-    # Step 3: Run this script (it automatically reads from both folders):
-    .\test_local_de04.ps1 -ThreadId "thr-005" -Port 8080
-    .\test_local_de04.ps1 -ThreadId "thr-005" -Port 8080 -Format "docx"
-    .\test_local_de04.ps1 -ThreadId "thr-005" -Port 8080 -Format "html"
+    # Step 3: Run this script:
+    .\test_local_de04.ps1 -ThreadId "thr-test-de04-new" -Port 8080
+    .\test_local_de04.ps1 -ThreadId "thr-test-de04-new" -Port 8080 -Format "docx"
 #>
 
 param(
@@ -38,59 +40,76 @@ $ErrorActionPreference = "Stop"
 
 # --- Config ---
 $BasePath  = "C:\SharedFolderAdlc"
-$InputDir1 = Join-Path (Join-Path $BasePath $ThreadId) "bs_docs"
-$InputDir2 = Join-Path (Join-Path $BasePath $ThreadId) "data_design_response"
-$OutputDir = Join-Path (Join-Path $BasePath $ThreadId) "api_contracts_response"
+$ThreadPath = Join-Path $BasePath $ThreadId
+$InputDir = Join-Path $ThreadPath "bs_docs"
+$OutputDir = Join-Path $ThreadPath "api_contracts_response"
 $ServerUrl = "http://127.0.0.1:$Port"
 $ApiKey    = "replace-me-bearer-token-genwiz-uses"
 
 # --- Ensure output folder exists ---
 if (!(Test-Path $OutputDir)) { New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null }
 
-# --- Verify input folders exist ---
-if (!(Test-Path $InputDir1)) {
-    Write-Host "[ERROR] Input folder not found: $InputDir1" -ForegroundColor Red
-    Write-Host "        Create it and drop your business spec files (.json/.docx/.pdf/.html/.htm) first." -ForegroundColor Red
+# --- Verify thread folder exists ---
+if (!(Test-Path $ThreadPath)) {
+    Write-Host "[ERROR] Thread folder not found: $ThreadPath" -ForegroundColor Red
+    Write-Host "        Create it first:  New-Item -ItemType Directory -Path `"$ThreadPath`"" -ForegroundColor Yellow
     exit 1
 }
 
-if (!(Test-Path $InputDir2)) {
-    Write-Host "[ERROR] Data design folder not found: $InputDir2" -ForegroundColor Red
-    Write-Host "        Run DE-03 first to generate the data design:" -ForegroundColor Yellow
-    Write-Host "        .\test_local_de03.ps1 -ThreadId `"$ThreadId`" -Port $Port" -ForegroundColor Yellow
+# --- Verify bs_docs folder exists ---
+if (!(Test-Path $InputDir)) {
+    Write-Host "[ERROR] Input folder not found: $InputDir" -ForegroundColor Red
+    Write-Host "        Create it and drop your business requirements (.json/.docx/.pdf/.html) first." -ForegroundColor Red
     exit 1
 }
 
-# Get input files from both folders
-$inputFiles1 = Get-ChildItem -Path $InputDir1 -File -ErrorAction SilentlyContinue |
+# Get input files from bs_docs
+$inputFiles = Get-ChildItem -Path $InputDir -File -ErrorAction SilentlyContinue |
     Where-Object { $_.Extension -in ".json",".docx",".pdf",".html",".htm" }
 
-# data_design_response should only have JSON files (DE-03 output)
-$inputFiles2 = Get-ChildItem -Path $InputDir2 -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.Extension -eq ".json" }
-
-if ($inputFiles1.Count -eq 0) {
-    Write-Host "[ERROR] No supported input files in: $InputDir1" -ForegroundColor Red
+if ($inputFiles.Count -eq 0) {
+    Write-Host "[ERROR] No supported input files in: $InputDir" -ForegroundColor Red
     Write-Host "        Supported extensions: .json .docx .pdf .html .htm" -ForegroundColor Red
     exit 1
 }
 
-if ($inputFiles2.Count -eq 0) {
-    Write-Host "[WARN] No data design files found in: $InputDir2" -ForegroundColor Yellow
-    Write-Host "       Run DE-03 first to generate the data model:" -ForegroundColor Yellow
-    Write-Host "       .\test_local_de03.ps1 -ThreadId `"$ThreadId`" -Port $Port" -ForegroundColor Yellow
-    Write-Host ""
+# --- Check for required agent interaction diagram ---
+$interactionDiagram = Get-ChildItem -Path $ThreadPath -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in "Business_Process_Agent_Interaction.html","Business_Process_Agent_Interaction.md" } |
+    Select-Object -First 1
+
+if (-not $interactionDiagram) {
+    Write-Host "[ERROR] Required file not found: Business_Process_Agent_Interaction.html or .md" -ForegroundColor Red
+    Write-Host "        Expected in: $ThreadPath" -ForegroundColor Red
+    Write-Host "        This file is MANDATORY for API Contract generation." -ForegroundColor Red
+    exit 1
+}
+
+# --- Check for optional files ---
+$networkDiagram = Get-ChildItem -Path $ThreadPath -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in "Business_Process_Agent_Network.html","Business_Process_Agent_Network.md" } |
+    Select-Object -First 1
+
+$brdResponseDir = Join-Path $ThreadPath "brd_response"
+$architectureFile = $null
+if (Test-Path $brdResponseDir) {
+    $architectureFile = Get-ChildItem -Path $brdResponseDir -File -Filter "agent_architecture.json" -ErrorAction SilentlyContinue
 }
 
 Write-Host "`n=== DE-04 API Contracts Local Test ===" -ForegroundColor Cyan
 Write-Host "Thread ID   : $ThreadId"
 Write-Host "Format      : $Format"
 Write-Host "Server      : $ServerUrl"
-Write-Host "Input dir 1 : $InputDir1"
-Write-Host "  Files     : $($inputFiles1.Name -join ', ')"
-Write-Host "Input dir 2 : $InputDir2"
-Write-Host "  Files     : $($inputFiles2.Name -join ', ')"
-Write-Host "Output dir  : $OutputDir"
+Write-Host "`nInput Files:" -ForegroundColor Yellow
+Write-Host "  bs_docs/  : $($inputFiles.Name -join ', ')" -ForegroundColor Green
+Write-Host "  Required  : $($interactionDiagram.Name)" -ForegroundColor Green
+if ($networkDiagram) {
+    Write-Host "  Optional  : $($networkDiagram.Name)" -ForegroundColor Green
+}
+if ($architectureFile) {
+    Write-Host "  Optional  : brd_response/$($architectureFile.Name)" -ForegroundColor Green
+}
+Write-Host "Output dir  : $OutputDir" -ForegroundColor Yellow
 Write-Host ""
 
 # --- Check if server is running ---
