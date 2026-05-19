@@ -114,8 +114,8 @@ def _make_handler(endpoint: str):
             )
 
         try:
-            from core.llm_client import LLMClient
-            llm_client = LLMClient()
+            from core.llm_factory import create_llm_client
+            llm_client = create_llm_client(cfg)
             llm_config = cfg.llm_config(entry.agent_id)
             
             # Read from all input folders and merge

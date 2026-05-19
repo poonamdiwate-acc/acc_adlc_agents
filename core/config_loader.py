@@ -195,8 +195,16 @@ class ADLCConfig:
     def _merge_llm(
         self, agent_id: str
     ) -> Tuple[Dict[str, Any], Dict[str, str]]:
+        llm_block = self._tech.get(_LLM_KEY, {}) or {}
+
+        # Resolve active provider defaults from providers map
+        active_provider = llm_block.get("active_provider", "google-vertex")
+        providers = llm_block.get("providers", {})
+        provider_defaults = providers.get(active_provider, {})
+
         layers: List[Tuple[str, Mapping[str, Any]]] = [
-            (_TECH_STACK_ID, self._tech.get(_LLM_KEY, {}) or {}),
+            (_TECH_STACK_ID, llm_block),
+            (f"{_TECH_STACK_ID}:provider:{active_provider}", provider_defaults),
             (_TECH_STACK_ID, self._tech.get(_LLM_DEFAULTS_KEY, {}) or {}),
             (
                 agent_id,
@@ -210,13 +218,24 @@ class ADLCConfig:
             for key, value in layer.items():
                 if key.startswith("_") or value is None:
                     continue
+                # Skip complex nested keys that are not LLM params
+                if key in ("providers", "env"):
+                    continue
                 merged[key] = value
                 sources[key] = layer_name
 
-        # Normalise model key — tech stack uses ``default_model`` but the LLM
+        # Normalise model key — provider uses ``default_model`` but the LLM
         # client expects ``model`` plus ``fallback_model``.
         if "default_model" in merged and "model" not in merged:
             merged["model"] = merged.pop("default_model")
+            sources["model"] = sources.pop("default_model", _TECH_STACK_ID)
+
+        # Allow user to override model via active_model in the llm block
+        active_model = llm_block.get("active_model")
+        if active_model:
+            merged["model"] = active_model
+            sources["model"] = f"{_TECH_STACK_ID}:active_model"
+
         return merged, sources
 
     def _require_agent(self, agent_id: str) -> Dict[str, Any]:

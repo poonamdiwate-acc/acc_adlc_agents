@@ -22,7 +22,7 @@ from typing import Any, Dict
 from agents.pl05_finops_architect import behaviour, input_builder, output_parser
 from core.agent_registry import register
 from core.config_loader import get_config
-from core.llm_client import LLMClient
+from core.llm_factory import create_llm_client
 from core.skill_loader import load_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ _inputs_cfg = _config.inputs(AGENT_ID)
 _llm_cfg = _config.llm_config(AGENT_ID)
 _system_prompt = load_system_prompt(_config.skill_file(AGENT_ID))
 
-_llm_client = LLMClient()
+_llm_client = create_llm_client(_config)
 
 logger.info(
     "PL-05 initialised: endpoint=%s",

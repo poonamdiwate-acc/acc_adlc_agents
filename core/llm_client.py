@@ -1,6 +1,11 @@
-"""Async Vertex Gemini LLM client.
+"""Async LLM client — standard (direct SDK) mode.
 
-Wraps :class:`google.genai.Client` (Vertex backend) with our retry policy:
+Supports multiple providers via the ``active_provider`` config field:
+- **google-vertex**: Uses ``google.genai.Client`` (Vertex backend)
+- **aws-bedrock**: Uses ``boto3`` Bedrock Runtime
+- **azure-openai**: Uses ``openai.AsyncAzureOpenAI``
+
+Retry policy (shared across providers):
 
 1. Try the primary ``model`` from the merged ``llm_config``.
 2. Retry up to ``retry_attempts`` times on timeouts and 429/5xx errors
@@ -8,10 +13,6 @@ Wraps :class:`google.genai.Client` (Vertex backend) with our retry policy:
 3. If all retries on the primary are exhausted, repeat the same loop on
    ``fallback_model``.
 4. On final failure, raise :class:`LLMCallError`.
-
-Project, region, and credentials are read from the standard Vertex env
-vars: ``GOOGLE_CLOUD_PROJECT``, ``GOOGLE_CLOUD_LOCATION``, and
-``GOOGLE_APPLICATION_CREDENTIALS`` (or default application credentials).
 
 System prompt and user-message contents are never written to logs or error
 detail payloads — only metadata (agent_id, model, attempt counters, error
@@ -32,6 +33,7 @@ from google.genai import types as genai_types
 from google.genai.errors import APIError, ClientError, ServerError
 
 from core.exceptions import LLMCallError
+from core.llm_base import BaseLLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -52,23 +54,44 @@ def _is_transient(exc: BaseException) -> bool:
     return False
 
 
-class LLMClient:
-    """Thin async wrapper around the Vertex Gemini generate_content API."""
+class LLMClient(BaseLLMClient):
+    """Standard-mode async LLM client — direct SDK calls per provider.
+
+    Defaults to Google Vertex (backward-compatible). Provider is determined
+    by the ``provider`` key in the merged config passed to :meth:`call`,
+    or by constructor argument.
+    """
 
     def __init__(
         self,
+        provider: Optional[str] = None,
         project: Optional[str] = None,
         location: Optional[str] = None,
     ) -> None:
-        # project / location default to GOOGLE_CLOUD_PROJECT and
-        # GOOGLE_CLOUD_LOCATION when None. Retry policy lives in this class,
-        # so SDK-level retries stay at their default (we control attempts via
-        # retry_attempts in the merged llm_config).
-        self._client = genai.Client(
-            vertexai=True,
-            project=project,
-            location=location,
-        )
+        self._provider = provider or "google-vertex"
+        self._google_client: Optional[Any] = None
+        self._azure_client: Optional[Any] = None
+
+        if self._provider == "google-vertex":
+            self._google_client = genai.Client(
+                vertexai=True,
+                project=project,
+                location=location,
+            )
+        elif self._provider == "azure-openai":
+            import openai
+            self._azure_client = openai.AsyncAzureOpenAI(
+                api_key=os.environ.get("AZURE_OPENAI_API_KEY"),
+                azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT", ""),
+                api_version=os.environ.get("AZURE_API_VERSION", "2024-06-01"),
+            )
+        elif self._provider == "aws-bedrock":
+            pass  # boto3 client created per-call (no persistent connection)
+        else:
+            raise LLMCallError(
+                f"Unknown LLM provider: {self._provider}",
+                detail={"provider": self._provider},
+            )
 
     async def call(
         self,
@@ -157,6 +180,58 @@ class LLMClient:
         response_mime_type: Optional[str],
         agent_id: str,
     ) -> str:
+        if self._provider == "google-vertex":
+            return await self._call_google(
+                model=model,
+                system_prompt=system_prompt,
+                user_message=user_message,
+                max_tokens=max_tokens,
+                timeout=timeout,
+                retry_attempts=retry_attempts,
+                response_mime_type=response_mime_type,
+                agent_id=agent_id,
+            )
+        elif self._provider == "azure-openai":
+            return await self._call_azure(
+                model=model,
+                system_prompt=system_prompt,
+                user_message=user_message,
+                max_tokens=max_tokens,
+                timeout=timeout,
+                retry_attempts=retry_attempts,
+                response_format=response_mime_type,
+                agent_id=agent_id,
+            )
+        elif self._provider == "aws-bedrock":
+            return await self._call_bedrock(
+                model=model,
+                system_prompt=system_prompt,
+                user_message=user_message,
+                max_tokens=max_tokens,
+                timeout=timeout,
+                retry_attempts=retry_attempts,
+                response_format=response_mime_type,
+                agent_id=agent_id,
+            )
+        else:
+            raise LLMCallError(
+                f"Unsupported provider: {self._provider}",
+                detail={"provider": self._provider, "agent_id": agent_id},
+            )
+
+    # -------------------------------------------------- Google Vertex provider
+    async def _call_google(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        max_tokens: int,
+        timeout: float,
+        retry_attempts: int,
+        response_mime_type: Optional[str],
+        agent_id: str,
+    ) -> str:
         attempts_allowed = max(retry_attempts, 0) + 1
         last_error: Optional[BaseException] = None
         generation_config = genai_types.GenerateContentConfig(
@@ -168,7 +243,7 @@ class LLMClient:
         for attempt in range(1, attempts_allowed + 1):
             try:
                 response = await asyncio.wait_for(
-                    self._client.aio.models.generate_content(
+                    self._google_client.aio.models.generate_content(
                         model=model,
                         contents=user_message,
                         config=generation_config,
@@ -222,6 +297,152 @@ class LLMClient:
                     type(last_error).__name__ if last_error else None
                 ),
             },
+        ) from last_error
+
+    # -------------------------------------------------- Azure OpenAI provider
+    async def _call_azure(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        max_tokens: int,
+        timeout: float,
+        retry_attempts: int,
+        response_format: Optional[str],
+        agent_id: str,
+    ) -> str:
+        import openai
+
+        attempts_allowed = max(retry_attempts, 0) + 1
+        last_error: Optional[BaseException] = None
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+        kwargs: Dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "timeout": timeout,
+        }
+        if response_format and "json" in response_format.lower():
+            kwargs["response_format"] = {"type": "json_object"}
+
+        for attempt in range(1, attempts_allowed + 1):
+            try:
+                response = await self._azure_client.chat.completions.create(**kwargs)
+            except (openai.RateLimitError, openai.InternalServerError, asyncio.TimeoutError) as exc:
+                last_error = exc
+                logger.warning(
+                    "LLM transient error: agent=%s model=%s attempt=%s/%s type=%s",
+                    agent_id, model, attempt, attempts_allowed, type(exc).__name__,
+                )
+                if attempt < attempts_allowed:
+                    delay = min(_BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)), _BACKOFF_MAX_SECONDS)
+                    await asyncio.sleep(delay)
+                continue
+            except openai.APIError as exc:
+                raise LLMCallError(
+                    f"Azure OpenAI API error: {type(exc).__name__}",
+                    detail={"agent_id": agent_id, "model": model, "error_type": type(exc).__name__},
+                ) from exc
+
+            text = response.choices[0].message.content or ""
+            if response.choices[0].finish_reason == "length":
+                raise LLMCallError(
+                    f"Azure output truncated at max_tokens={max_tokens}",
+                    detail={"agent_id": agent_id, "model": model, "max_tokens": max_tokens, "finish_reason": "length"},
+                )
+            _maybe_capture(agent_id, text, response)
+            return text
+
+        raise LLMCallError(
+            f"LLM exhausted {attempts_allowed} attempts on {model}",
+            detail={"agent_id": agent_id, "model": model, "attempts": attempts_allowed,
+                    "error_type": type(last_error).__name__ if last_error else None},
+        ) from last_error
+
+    # -------------------------------------------------- AWS Bedrock provider
+    async def _call_bedrock(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        max_tokens: int,
+        timeout: float,
+        retry_attempts: int,
+        response_format: Optional[str],
+        agent_id: str,
+    ) -> str:
+        import json as _json
+        import boto3
+        from botocore.exceptions import ClientError as BotoClientError
+
+        attempts_allowed = max(retry_attempts, 0) + 1
+        last_error: Optional[BaseException] = None
+
+        region = os.environ.get("AWS_REGION", "us-east-1")
+        bedrock = boto3.client("bedrock-runtime", region_name=region)
+
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": max_tokens,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_message}],
+        }
+
+        for attempt in range(1, attempts_allowed + 1):
+            try:
+                loop = asyncio.get_event_loop()
+                response = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        lambda: bedrock.invoke_model(
+                            modelId=model,
+                            contentType="application/json",
+                            accept="application/json",
+                            body=_json.dumps(body),
+                        ),
+                    ),
+                    timeout=timeout,
+                )
+            except (BotoClientError, asyncio.TimeoutError) as exc:
+                last_error = exc
+                logger.warning(
+                    "LLM transient error: agent=%s model=%s attempt=%s/%s type=%s",
+                    agent_id, model, attempt, attempts_allowed, type(exc).__name__,
+                )
+                if attempt < attempts_allowed:
+                    delay = min(_BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)), _BACKOFF_MAX_SECONDS)
+                    await asyncio.sleep(delay)
+                continue
+            except Exception as exc:
+                raise LLMCallError(
+                    f"Bedrock API error: {type(exc).__name__}",
+                    detail={"agent_id": agent_id, "model": model, "error_type": type(exc).__name__},
+                ) from exc
+
+            result = _json.loads(response["body"].read())
+            text = ""
+            for block in result.get("content", []):
+                if block.get("type") == "text":
+                    text += block.get("text", "")
+
+            if result.get("stop_reason") == "max_tokens":
+                raise LLMCallError(
+                    f"Bedrock output truncated at max_tokens={max_tokens}",
+                    detail={"agent_id": agent_id, "model": model, "max_tokens": max_tokens, "finish_reason": "max_tokens"},
+                )
+            _maybe_capture(agent_id, text, response)
+            return text
+
+        raise LLMCallError(
+            f"LLM exhausted {attempts_allowed} attempts on {model}",
+            detail={"agent_id": agent_id, "model": model, "attempts": attempts_allowed,
+                    "error_type": type(last_error).__name__ if last_error else None},
         ) from last_error
 
 
