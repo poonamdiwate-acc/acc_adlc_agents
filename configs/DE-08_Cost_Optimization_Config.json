@@ -82,18 +82,20 @@
 
   "inputs": {
     "structured_requirements": {
-      "required":   true,
+      "required":   false,
       "type":       "array",
       "git_path":   "runs/{run_id}/plan/AD-01_output.json",
       "json_field": "structured_requirements",
       "min_items":  1,
-      "on_fail":    "stop_and_report"
+      "on_fail":    "stop_and_report",
+      "_note": "Optional when agent_network_html is present — architecture-only mode derives all costs from topology. Both inputs empty triggers stop_and_report."
     },
     "agent_network_html": {
-      "required":    true,
+      "required":    false,
       "type":        "string",
       "description": "Architecture context for the system — may be raw HTML of a business-process/agent-network diagram, or a JSON agent-architecture specification. Drives per-service cost estimation — extract services, data stores, external integrations, and communication patterns.",
-      "on_fail":     "stop_and_report"
+      "on_fail":     "stop_and_report",
+      "_note": "Optional when structured_requirements is present. Both inputs empty triggers stop_and_report."
     }
   },
 

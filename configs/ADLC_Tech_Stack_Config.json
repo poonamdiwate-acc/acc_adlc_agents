@@ -26,7 +26,7 @@
         "sdk": "google-genai",
         "sdk_version": ">=0.8.0",
         "default_model": "gemini-2.5-flash",
-        "fallback_model": "gemini-2.5-flash",
+        "fallback_model": "gemini-2.5-flash-lite",
         "litellm_prefix": "vertex_ai",
         "env": ["GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION", "GOOGLE_APPLICATION_CREDENTIALS"]
       },

@@ -59,23 +59,23 @@ Structures cost data into FinOps-ready outputs — tagging strategies for cost a
 
 | Field | Required | Source | On missing |
 |---|---|---|---|
-| `structured_requirements` | Yes | Git — `runs/{run_id}/plan/AD-01_output.json` | `stop_and_report` |
-| `agent_network_html` | Yes | phase_input (passed by GenWiz; in dev, loaded from `dev.phase_input_text_files`) | `stop_and_report` |
+| `structured_requirements` | One of the two required | Shared folder (`bs_docs`) or Git — `runs/{run_id}/plan/AD-01_output.json` | `stop_and_report` if both inputs empty; proceed in architecture-only mode if `agent_network_html` present |
+| `agent_network_html` | One of the two required | Shared folder (`bs_docs`) — HTML/Mermaid diagram or JSON agent-architecture | `stop_and_report` if both inputs empty; proceed with requirements-only estimation if `structured_requirements` present |
 
 ### Input validation rules
 
 **`structured_requirements`** — read from git using `run_id` from `X-Run-ID` header. Minimum 1 item. If the git file is not found or the field is empty → stop and report.
 
-**`agent_network_html`** — raw HTML string of the agent-network / business-process diagram (typically a Mermaid graph embedded in a styled HTML page). The LLM should:
+**`agent_network_html`** — raw HTML string of the agent-network / business-process diagram (typically a Mermaid graph embedded in a styled HTML page), or a JSON agent-architecture specification. The LLM should:
 
-1. Extract the Mermaid graph definition (or any structured diagram code) from the HTML body.
+1. Extract the Mermaid graph definition or structured diagram code from the HTML body.
 2. Identify services / agents (graph nodes) — these become cost centers.
-3. Identify data stores (database nodes) — these drive storage cost estimates.
+3. Identify data stores (database/cache nodes) — these drive storage cost estimates.
 4. Identify external integrations (third-party nodes) — these drive third_party cost estimates.
 5. Identify communication patterns (edges) — sync/async, high-fan-out patterns drive network costs.
 6. Ignore styling/CSS/JS — only the diagram code and any narrative text near it matter.
 
-If the field is missing or an empty string → stop and report.
+If both `agent_network_html` and `structured_requirements` are missing or empty → stop and report. If only `agent_network_html` is missing but requirements are present → proceed with requirements-only cost estimation.
 
 ---
 
@@ -188,23 +188,40 @@ CONFIDENCE — assign exactly one to every cost line item and every optimization
 
 RULES:
 1. Every cost line item must have a sequential cost_id: CE-001, CE-002... no gaps
-2. Every cost line item must reference at least one REQ-### in req_id_refs
+2. req_id_refs MUST reference INPUT IDs present in 'structured_requirements' above (the
+   exact IDs in the input JSON — e.g. NFR-001, FR-003, REQ-006). CRITICAL: do NOT use
+   output CE-### or OPT-### sequence numbers you are generating — those are output IDs,
+   not input IDs. For architecture-derived cost line items (service from topology with no
+   direct requirement source), reference the MOST RELEVANT input requirement ID (e.g. a
+   performance, scalability, or availability requirement). Never leave req_id_refs empty
+   when structured_requirements is non-empty.
 3. Every cost line item must specify a service from agent_network_html
 4. Every service extracted from agent_network_html should have at least one cost line item
 5. Every optimization must have a sequential opt_id: OPT-001, OPT-002... no gaps
 6. Every optimization must specify estimated_savings_pct and estimated_savings_monthly_usd
 7. Every optimization must acknowledge a trade_off — there is no free lunch
-8. total_monthly_usd must equal the sum of all line_items monthly_usd values
-9. total_annual_usd must equal total_monthly_usd * 12
-10. Do not invent costs or optimizations that have no basis in the inputs — if a
+8. For optimization req_id_refs: same rule as cost line items — reference INPUT IDs only,
+   not CE-### or OPT-### output IDs. Reference the requirement(s) the optimization most
+   directly impacts.
+9. total_monthly_usd must equal the sum of all line_items monthly_usd values
+10. total_annual_usd must equal total_monthly_usd * 12
+11. The assumptions array MUST be populated — list every estimation assumption made:
+    at minimum the pricing model (e.g. on-demand), cloud region assumed, storage growth
+    rate assumed, and any throughput/user-count baselines applied. Never return an empty
+    assumptions array.
+12. Do not invent costs or optimizations that have no basis in the inputs — if a
     service has no clear cost driver in the requirements, estimate minimal baseline
     cost with confidence: medium
-11. If structured_requirements is empty → stop. Return error: "structured_requirements is empty"
-12. If agent_network_html is missing or empty → stop. Return error: "agent_network_html is required"
-13. Any line item or optimization with confidence: low is blocking — include it but flag it
-14. Use on-demand/pay-as-you-go pricing as the baseline — optimizations propose
+13. If structured_requirements is empty AND agent_network_html is present → proceed in
+    architecture-only mode: derive all costs from agent_network_html topology, set all
+    req_id_refs to []. If BOTH are empty → stop. Return error: "structured_requirements
+    and agent_network_html are both empty"
+14. If agent_network_html is missing or empty AND structured_requirements is also empty →
+    stop. Return error: "agent_network_html is required"
+15. Any line item or optimization with confidence: low is blocking — include it but flag it
+16. Use on-demand/pay-as-you-go pricing as the baseline — optimizations propose
     alternatives (reserved, spot, etc.)
-15. All monetary values in USD — do not use other currencies
+17. All monetary values in USD — do not use other currencies
 
 OVERALL CONFIDENCE — for cost_estimate:
 - high: all line items confidence: high, total based on concrete usage data
@@ -242,9 +259,10 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 
 | Condition | Action |
 |---|---|
-| `structured_requirements` empty | Stop. Report: `"structured_requirements is empty"` |
-| Git file not found for run_id | Stop. Report: `"AD-01 output not found in git for run_id"` |
-| `agent_network_html` missing or empty | Stop. Report: `"agent_network_html is required"` |
+| `structured_requirements` empty but `agent_network_html` present | Proceed in architecture-only mode. Derive all costs from topology. Set all `req_id_refs` to `[]` (no input IDs to reference). |
+| Both `structured_requirements` and `agent_network_html` empty | Stop. Report: `"structured_requirements and agent_network_html are both empty"` |
+| Git file not found for run_id | Continue with shared folder data. Log warning. |
+| `agent_network_html` missing or empty (but requirements present) | Proceed. Estimate costs from requirements only. Set affected line items `confidence` to `medium`. Note topology gap in assumptions. |
 | Diagram code not extractable from HTML | Proceed. Use requirements alone to estimate costs. Set affected line items confidence to `medium`. Note the gap in rationale. |
 | REQ has no cost implication | Skip. Do not create a placeholder cost line. |
 | Service in diagram has no usage data in requirements | Create minimal baseline estimate (1 small instance). Set confidence to `medium`. State assumption in rationale. |
@@ -268,6 +286,9 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 | AC-05 | All `req_id_refs` valid | Reference real REQ-### from `structured_requirements` |
 | AC-06 | `cost_estimate` complete | Object with `total_monthly_usd`, `total_annual_usd`, `line_items`, `assumptions`, `overall_confidence`, `recommendation` |
 | AC-07 | Totals consistent | `total_monthly_usd` == sum of line_items `monthly_usd`; `total_annual_usd` == `total_monthly_usd` * 12 |
+| AC-16 | `assumptions` non-empty | Array contains at least one string; includes pricing model, region, and any throughput/volume baselines assumed |
+| AC-17 | `req_id_refs` use input IDs | All refs are IDs from `structured_requirements` input — no CE-### or OPT-### output sequence numbers |
+| AC-18 | Architecture-only mode | When `structured_requirements` is empty, all `req_id_refs` are `[]` and all costs are derived from topology |
 | AC-08 | `optimization_plan` items complete | Each has `opt_id`, `title`, `category`, `description`, `estimated_savings_pct`, `estimated_savings_monthly_usd`, `priority`, `trade_off`, `confidence`, `req_id_refs` |
 | AC-09 | `opt_id` sequential | OPT-001, OPT-002... no gaps in sequence |
 | AC-10 | Optimization `category` from allowed list | All values from `optimization_types` config |
@@ -297,9 +318,13 @@ Return only the JSON object. No explanation, no markdown, no preamble.
 **Input:** REQ-006 requires GPU inference at 1000 RPM; REQ-003 requires sub-2s dashboard loads for 500 concurrent users
 **Expected:** Multiple compute/managed_services line items, optimizations for autoscaling and reserved instances, total likely high, recommendation: `optimize_first`
 
-### Test 5 — Empty requirements
-**Input:** `structured_requirements: []`
-**Expected:** Pipeline stopped. Error: `"structured_requirements is empty"`
+### Test 5 — Architecture-only mode (no structured requirements)
+**Input:** `structured_requirements: []`, valid `agent_network_html` with 4 services and 2 data stores
+**Expected:** Cost line items derived entirely from topology, all `req_id_refs` are `[]`, `overall_confidence: medium`, assumptions array populated with region/pricing model/volume baselines
+
+### Test 8 — Both inputs empty
+**Input:** `structured_requirements: []`, `agent_network_html: ""`
+**Expected:** Pipeline stopped. Error: `"structured_requirements and agent_network_html are both empty"`
 
 ### Test 6 — Missing agent_network_html
 **Input:** valid `structured_requirements`, but `agent_network_html: ""`

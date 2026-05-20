@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Union
 
 
 _NFR_PREFIX_RE = re.compile(r"^NFR[-_]", re.IGNORECASE)
+_NON_NFR_PREFIX_RE = re.compile(r"^(FR|IR|UC|BR|AR)[-_]", re.IGNORECASE)
 
 _NFR_TYPE_KEYWORDS = {"non_functional", "non-functional", "nonfunctional", "nfr"}
 
@@ -28,6 +29,8 @@ _NFR_SUBTYPE_KEYWORDS = {
 def _is_nfr_requirement(req: Dict[str, Any]) -> bool:
     """Determine if a requirement is non-functional by ID prefix, type, or subtype."""
     req_id = req.get("req_id", "")
+    if _NON_NFR_PREFIX_RE.match(req_id):
+        return False
     if _NFR_PREFIX_RE.match(req_id):
         return True
 
@@ -105,9 +108,12 @@ def build_user_message(payload: Dict[str, Any]) -> str:
             "  * Observability: SLOs/SLIs, alerting thresholds, distributed tracing needs\n"
             "- For security_controls: extract trust boundaries and external interfaces from "
             "'agent_network_html' to identify threat surfaces and define controls.\n"
-            "- In req_id_refs, only reference IDs that appear in 'structured_requirements'. "
-            "For architecture-derived NFRs with no direct requirement source, reference the "
-            "most relevant NFR ID (e.g. availability or security requirement).\n\n"
+            "- req_id_refs MUST reference INPUT IDs present in 'structured_requirements' above "
+            "(e.g. NFR-001, NFR-UC2-003 — the exact IDs in the input JSON). CRITICAL: do NOT "
+            "use output NFR-### sequence numbers you are generating — those are your output IDs, "
+            "not input IDs. For architecture-derived NFRs, always reference the most relevant "
+            "input NFR ID from 'structured_requirements' (never leave req_id_refs empty when "
+            "structured_requirements is non-empty).\n\n"
         )
     else:
         preamble = (

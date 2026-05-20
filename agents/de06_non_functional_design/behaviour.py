@@ -20,11 +20,14 @@ from the agent config.
 
 from __future__ import annotations
 
+import logging
 import re
 from collections import Counter
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.exceptions import PipelineStopError
+
+logger = logging.getLogger(__name__)
 
 
 _POSTURE_STRONG = "strong"
@@ -168,6 +171,15 @@ def coerce_req_id_refs(
         if not isinstance(refs, list):
             nfr["req_id_refs"] = []
             continue
+        invalid = [ref for ref in refs if ref not in valid_ids]
+        if invalid:
+            logger.warning(
+                "DE-06 coerce_req_id_refs: stripped invalid refs from %s — "
+                "refs %s not in structured_requirements (likely LLM used output "
+                "NFR-### numbers instead of input IDs)",
+                nfr.get("nfr_id", "?"),
+                invalid,
+            )
         nfr["req_id_refs"] = [ref for ref in refs if ref in valid_ids]
     return nfr_specifications
 
@@ -193,6 +205,14 @@ def coerce_control_req_id_refs(
         if not isinstance(refs, list):
             control["req_id_refs"] = []
             continue
+        invalid = [ref for ref in refs if ref not in nfr_ids]
+        if invalid:
+            logger.warning(
+                "DE-06 coerce_control_req_id_refs: stripped invalid refs from %s — "
+                "refs %s not in structured_requirements NFR IDs",
+                control.get("control_id", "?"),
+                invalid,
+            )
         control["req_id_refs"] = [ref for ref in refs if ref in nfr_ids]
     return controls
 

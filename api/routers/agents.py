@@ -198,25 +198,6 @@ def _make_handler(endpoint: str):
                     "Could not write to shared folder: agent=%s thread=%s err=%s",
                     entry.agent_id, x_thread_id, exc,
                 )
-            # When JSON is requested, also write HTML companion for human viewing
-            # Best-effort — never block the response on render/IO failures.
-            if fmt == "json":
-                try:
-                    write_output(
-                        base_path=base_path,
-                        thread_id=x_thread_id,
-                        output_subfolder=output_subfolder,
-                        agent_id=entry.agent_id,
-                        result=result,
-                        output_format="html",
-                        output_filename=output_filename,
-                    )
-                except Exception as exc:
-                    logger.info(
-                        "HTML companion not written (skipped): agent=%s "
-                        "thread=%s err=%s",
-                        entry.agent_id, x_thread_id, exc,
-                    )
 
         # --- HTTP response ---
         if fmt == "json":

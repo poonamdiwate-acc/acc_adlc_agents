@@ -174,7 +174,7 @@ NFR OUTPUT FIELDS (all required per item):
 - failure_scenario: what happens on violation + automated response (auto-scale, circuit break, alert)
 - acceptance_criteria: specific load/soak/chaos test scenarios to validate
 - monitoring_strategy: dashboards, alert thresholds (warning + critical), trace sampling rate
-- req_id_refs: IDs from structured_requirements ONLY. No FR-xxx or IR-xxx. Empty [] for architecture-derived NFRs with no direct source.
+- req_id_refs: INPUT IDs from structured_requirements ONLY (e.g. NFR-001, NFR-UC2-003 — the IDs present in the input JSON above). CRITICAL: do NOT use the output NFR-### sequence numbers you are generating — those are your output IDs, not input IDs. No FR-xxx or IR-xxx refs. For architecture-derived NFRs with no single direct source, reference the MOST RELEVANT input NFR ID (e.g. for a Kafka latency NFR, reference the ticket-enrichment or real-time-visibility input NFR). Only use [] when structured_requirements is completely empty (architecture-only mode with no input requirements at all).
 
 SECURITY CONTROL FIELDS (per item):
 - control_id: SC-001, SC-002... sequential
@@ -194,7 +194,7 @@ RULES:
 2. Derive ADDITIONAL NFRs from architecture — do not just restate inputs
 3. req_id_refs must ONLY contain NFR-prefixed IDs from structured_requirements
 4. Every description must be 3+ sentences with scope, measurement method, boundary conditions
-5. If structured_requirements is empty, derive all NFRs from architecture (set req_id_refs: [])
+5. If structured_requirements is empty (architecture-only mode), derive all NFRs from architecture (set req_id_refs: []). Otherwise req_id_refs must NEVER be empty — always reference the most relevant input NFR ID.
 6. Compliance_mappings only if SOC2/ISO27001/GDPR/PCI-DSS/HIPAA mentioned
 7. Any confidence: low item is blocking — include but flag it
 
@@ -218,7 +218,7 @@ OUTPUT: Return ONLY a valid JSON object with keys "nfr_specifications" (array) a
 
 | Condition | Action |
 |---|---|
-| `structured_requirements` empty but `agent_network_html` present | Proceed. Derive all NFRs from architecture. Set all `req_id_refs` to `[]`. |
+| `structured_requirements` empty but `agent_network_html` present | Proceed. Derive all NFRs from architecture. Set all `req_id_refs` to `[]` (architecture-only mode — no input IDs exist to reference). |
 | Both `structured_requirements` and `agent_network_html` empty | Stop. Report: `"structured_requirements is empty"` |
 | Git file not found for run_id | Continue with shared folder data. Log warning. |
 | `agent_network_html` missing or empty | Stop. Report: `"agent_network_html is required"` |
