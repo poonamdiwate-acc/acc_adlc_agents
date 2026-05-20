@@ -63,6 +63,59 @@ def resolve_output_folder(
     return folder
 
 
+def find_file_by_patterns(
+    base_path: str,
+    thread_id: str,
+    subfolder: str,
+    file_name_patterns: List[str],
+    allowed_extensions: Optional[List[str]] = None,
+) -> Optional[Path]:
+    """Find first file matching any of the given name patterns.
+    
+    Args:
+        base_path: Base shared folder path
+        thread_id: Thread ID
+        subfolder: Subfolder to search (use "." for thread root)
+        file_name_patterns: List of exact file names to search for
+        allowed_extensions: Optional list of allowed extensions (e.g., [".html", ".md"])
+    
+    Returns:
+        Path to the first matching file, or None if not found
+    """
+    # Resolve folder
+    if subfolder == ".":
+        folder = Path(base_path) / thread_id
+    else:
+        folder = Path(base_path) / thread_id / subfolder
+    
+    if not folder.is_dir():
+        logger.debug(
+            "Folder not found for file search: %s (thread=%s, subfolder=%s)",
+            folder, thread_id, subfolder
+        )
+        return None
+    
+    # Search for files matching patterns
+    for pattern in file_name_patterns:
+        for file_path in folder.iterdir():
+            if not file_path.is_file():
+                continue
+            if _is_hidden_or_lockfile(file_path):
+                continue
+            
+            # Check if filename matches pattern
+            if file_path.name == pattern:
+                # Check extension if specified
+                if allowed_extensions is None or file_path.suffix.lower() in allowed_extensions:
+                    logger.info(
+                        "Found file by pattern: %s (thread=%s, pattern=%s)",
+                        file_path.name, thread_id, pattern
+                    )
+                    return file_path
+    
+    return None
+
+
 def list_input_files(folder: Path, allowed_extensions: Optional[List[str]] = None) -> List[Path]:
     """List all supported files in the input folder (non-recursive).
 

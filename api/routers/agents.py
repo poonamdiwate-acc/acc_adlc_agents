@@ -34,6 +34,7 @@ from core.exceptions import (
 )
 from core.format_handler import (
     SUPPORTED_OUTPUT_FORMATS,
+    parse_input,
     render_output,
 )
 from core.shared_folder import read_inputs, write_output
@@ -90,44 +91,50 @@ def _make_handler(endpoint: str):
         shared_io = cfg.shared_io_config(entry.agent_id)
 
         base_path = shared_cfg.get("base_path", "")
-        # Support both single input_subfolder and array input_subfolders
         input_subfolder = shared_io.get("input_subfolder")
         input_subfolders = shared_io.get("input_subfolders")
-        
+        output_subfolder = shared_io.get("output_subfolder", "")
+        output_filename = shared_io.get("output_filename") or None
+
+        # Support both single input_subfolder and multiple input_subfolders
         if input_subfolders:
-            # Array of subfolders (e.g., DE-04)
             input_folders_list = input_subfolders if isinstance(input_subfolders, list) else [input_subfolders]
         elif input_subfolder:
-            # Single subfolder (e.g., PL-01, DE-03)
             input_folders_list = [input_subfolder]
         else:
             input_folders_list = []
-            
-        output_subfolder = shared_io.get("output_subfolder", "")
-        output_filename = shared_io.get("output_filename") or None
 
         if not base_path or not input_folders_list:
             raise HTTPException(
                 status_code=500,
                 detail={
                     "error": "server_misconfigured",
-                    "message": "shared_folder.base_path and shared_io.input_subfolder(s) must be configured",
+                    "message": "shared_folder.base_path and shared_io input_subfolder(s) must be configured",
                 },
             )
 
         try:
-            from core.llm_client import LLMClient
-            llm_client = LLMClient()
+            from core.llm_factory import create_llm_client
+            llm_client = create_llm_client(cfg)
             llm_config = cfg.llm_config(entry.agent_id)
-            payload = await read_inputs(
-                base_path=base_path,
-                thread_id=x_thread_id,
-                input_subfolder=input_subfolder,
-                agent_id=entry.agent_id,
-                llm_client=llm_client,
-                llm_config=llm_config,
-            )
-        except (ValueError, OSError) as exc:
+            
+            # Read from all input folders and merge
+            payload = {}
+            for subfolder in input_folders_list:
+                # Special filtering: data_design_response folder reads only JSON files
+                allowed_extensions = [".json"] if subfolder == "data_design_response" else None
+                
+                folder_payload = await read_inputs(
+                    base_path=base_path,
+                    thread_id=x_thread_id,
+                    input_subfolder=subfolder,
+                    agent_id=entry.agent_id,
+                    llm_client=llm_client,
+                    llm_config=llm_config,
+                    allowed_extensions=allowed_extensions,
+                )
+                payload.update(folder_payload)
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
                 detail={"error": "shared_folder_error", "message": str(exc)},
@@ -191,6 +198,25 @@ def _make_handler(endpoint: str):
                     "Could not write to shared folder: agent=%s thread=%s err=%s",
                     entry.agent_id, x_thread_id, exc,
                 )
+            # When JSON is requested, also write HTML companion for human viewing
+            # Best-effort — never block the response on render/IO failures.
+            if fmt == "json":
+                try:
+                    write_output(
+                        base_path=base_path,
+                        thread_id=x_thread_id,
+                        output_subfolder=output_subfolder,
+                        agent_id=entry.agent_id,
+                        result=result,
+                        output_format="html",
+                        output_filename=output_filename,
+                    )
+                except Exception as exc:
+                    logger.info(
+                        "HTML companion not written (skipped): agent=%s "
+                        "thread=%s err=%s",
+                        entry.agent_id, x_thread_id, exc,
+                    )
 
         # --- HTTP response ---
         if fmt == "json":

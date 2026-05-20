@@ -76,6 +76,7 @@ def parse(
     source of truth, not whatever the LLM produced.
     """
     payload = _load_json(raw_text)
+    payload = _normalize_specs(payload)
 
     try:
         parsed = _ContractsPayload.model_validate(payload)
@@ -115,6 +116,38 @@ def parse(
         "openapi_spec": [item.model_dump() for item in parsed.openapi_spec],
         "schema_registry": registry,
     }
+
+
+def _normalize_specs(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Coerce common LLM drift on openapi_spec items before pydantic.
+
+    Gemini sometimes emits ``request_schema`` / ``response_schema`` as a
+    JSON-encoded string instead of an actual JSON object. The pydantic
+    field is typed ``Optional[Dict[str, Any]]`` so a string is rejected.
+    We try to parse the string back into a dict; if that fails, we set
+    the field to None rather than fail the whole parse.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    specs = payload.get("openapi_spec")
+    if not isinstance(specs, list):
+        return payload
+    for spec in specs:
+        if not isinstance(spec, dict):
+            continue
+        for field in ("request_schema", "response_schema"):
+            val = spec.get(field)
+            if isinstance(val, str):
+                stripped = val.strip()
+                if not stripped:
+                    spec[field] = None
+                    continue
+                try:
+                    parsed = json.loads(stripped)
+                    spec[field] = parsed if isinstance(parsed, dict) else None
+                except json.JSONDecodeError:
+                    spec[field] = None
+    return payload
 
 
 def _normalize_registry(registry: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:

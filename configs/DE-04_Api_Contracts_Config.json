@@ -108,6 +108,24 @@
       "type": "object",
       "on_missing": "proceed_without",
       "description": "Optional API design constraints"
+    },
+    "agent_interaction_diagram": {
+      "required": true,
+      "type": "string",
+      "on_fail": "stop_and_report",
+      "description": "Agent interaction diagram (Business_Process_Agent_Interaction.html or .md) showing workflow between agents"
+    },
+    "agent_network_diagram": {
+      "required": false,
+      "type": "string",
+      "on_fail": "proceed_without",
+      "description": "Agent network diagram (Business_Process_Agent_Network.html or .md) showing agent topology"
+    },
+    "agent_architecture": {
+      "required": false,
+      "type": "object",
+      "on_fail": "proceed_without",
+      "description": "Agent architecture JSON from BRD response containing agent specifications"
     }
   },
 
@@ -202,9 +220,39 @@
     }
   },
   "shared_io": {
-    "input_subfolders": ["bs_docs", "data_design_response"],
+    "input_sources": [
+      {
+        "subfolder": "bs_docs",
+        "allowed_extensions": [".json", ".docx", ".pdf", ".html"],
+        "description": "Business requirements with structured_requirements"
+      },
+      {
+        "subfolder": ".",
+        "file_name_patterns": ["Business_Process_Agent_Interaction.html", "Business_Process_Agent_Interaction.md"],
+        "allowed_extensions": [".html", ".md"],
+        "required": true,
+        "field_name": "agent_interaction_diagram",
+        "description": "Agent interaction diagram (searches in thread root)"
+      },
+      {
+        "subfolder": ".",
+        "file_name_patterns": ["Business_Process_Agent_Network.html", "Business_Process_Agent_Network.md"],
+        "allowed_extensions": [".html", ".md"],
+        "required": false,
+        "field_name": "agent_network_diagram",
+        "description": "Agent network diagram (searches in thread root)"
+      },
+      {
+        "subfolder": "brd_response",
+        "file_name_patterns": ["agent_architecture.json"],
+        "allowed_extensions": [".json"],
+        "required": false,
+        "field_name": "agent_architecture",
+        "description": "Agent architecture JSON from BRD"
+      }
+    ],
     "output_subfolder": "api_contracts_response",
     "output_filename": "api_contracts_design",
-    "_note": "API Contracts reads from TWO folders: bs_docs (all formats) and data_design_response (JSON only - DE-03 output)"
+    "_note": "API Contracts reads from: 1) bs_docs (requirements), 2) thread root (agent diagrams by name), 3) brd_response (architecture JSON)"
   }
 }

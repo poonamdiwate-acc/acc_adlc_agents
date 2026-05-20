@@ -24,6 +24,7 @@ from core.input_parsers import (
     HtmlParser,
     InputParser,
     JsonParser,
+    MarkdownParser,
     ParsedDocument,
     PdfParser,
 )
@@ -47,6 +48,7 @@ _PARSERS: list[InputParser] = [
     DocxParser(),
     PdfParser(),
     HtmlParser(),
+    MarkdownParser(),
 ]
 
 _RENDERERS: Dict[str, OutputRenderer] = {
@@ -56,7 +58,7 @@ _RENDERERS: Dict[str, OutputRenderer] = {
     "html": HtmlRenderer(),
 }
 
-SUPPORTED_INPUT_FORMATS = ["json", "docx", "pdf", "html"]
+SUPPORTED_INPUT_FORMATS = ["json", "docx", "pdf", "html", "md"]
 SUPPORTED_OUTPUT_FORMATS = list(_RENDERERS.keys())
 
 
@@ -78,6 +80,8 @@ def get_parser_for_extension(filename: str) -> Optional[InputParser]:
         "pdf": PdfParser(),
         "html": HtmlParser(),
         "htm": HtmlParser(),
+        "md": MarkdownParser(),
+        "markdown": MarkdownParser(),
     }
     return ext_map.get(ext)
 
@@ -475,6 +479,8 @@ extract ALL of them into the single "structured_requirements" array.
 
 _AGENT_EXTRACTION_PROMPTS: Dict[str, str] = {
     "PL-01": _AD04_EXTRACTION_PROMPT,
+    "AD-04": _AD04_EXTRACTION_PROMPT,
+    "PL-01": _AD04_EXTRACTION_PROMPT,  # Gap detection uses same extraction as AD-04
     "DE-03": _DE03_EXTRACTION_PROMPT,
     "DE-04": _DE04_EXTRACTION_PROMPT,
     "DE-06": _DE06_EXTRACTION_PROMPT,
