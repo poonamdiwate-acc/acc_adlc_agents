@@ -3,7 +3,7 @@
 
 Read this fully before opening the template.
 Every `{{PLACEHOLDER}}` in the template maps to a section below.
-Fields marked **DO NOT CHANGE** must stay exactly as written.
+Fields marked **DO NOT CHANGE** must stay exactly as written.,
 
 ---
 
