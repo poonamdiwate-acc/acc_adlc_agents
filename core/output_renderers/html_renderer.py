@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from core.output_renderers.base import OutputRenderer, RenderedOutput
 
@@ -63,6 +64,10 @@ class HtmlRenderer(OutputRenderer):
             pps_threshold_config=result.get("pps_threshold_config", {}),
             forecast_baseline=result.get("forecast_baseline", {}),
             activation_summary=result.get("activation_summary", {}),
+            # VA-04 (Compliance Agent) fields
+            compliance_audit_trail=result.get("compliance_audit_trail", []),
+            policy_signoff=result.get("policy_signoff", {}),
+            artefact_groups=_group_by_artefact(result.get("compliance_audit_trail", [])),
         )
 
         content = html_content.encode("utf-8")
@@ -71,3 +76,12 @@ class HtmlRenderer(OutputRenderer):
             content_type="text/html; charset=utf-8",
             filename=f"{agent_id}_output_{run_id}.html",
         )
+
+
+def _group_by_artefact(audit_trail: List[Dict[str, Any]]) -> "OrderedDict[str, List[Dict[str, Any]]]":
+    """Group compliance checks by artefact_ref preserving insertion order."""
+    groups: OrderedDict = OrderedDict()
+    for check in audit_trail:
+        ref = check.get("artefact_ref") or "unknown"
+        groups.setdefault(ref, []).append(check)
+    return groups

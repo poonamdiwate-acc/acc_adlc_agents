@@ -1,0 +1,203 @@
+{
+  "_readme": "VA-04 Compliance Agent config. Autonomously generates and signs off the compliance audit trail, replacing the CAB (Change Advisory Board) in the Validate phase. Use this alongside AGENT_CONFIG_INSTRUCTIONS.md to understand how to fill your own agent config.",
+
+  "agent": {
+    "id":            "VA-04",
+    "name":          "Compliance Agent",
+    "version":       "1.0.0",
+    "description":   "Replaces CAB — autonomously generates and signs off the compliance audit trail.",
+    "phase":         "validate",
+    "standalone":    true,
+    "endpoint":      "/agents/compliance",
+    "mcp_tool_name": "run_compliance",
+    "skill_file":    "VA-04_Compliance_SKILL.md",
+    "step_number":   27,
+    "previous_step": {
+      "step_number": 26,
+      "agent_id":    "VA-03",
+      "agent_name":  "Rollback Agent"
+    }
+  },
+
+  "llm_config_override": {
+    "max_tokens":      32768,
+    "timeout_seconds": 180
+  },
+
+  "behaviour": {
+    "on_empty_requirements":   "stop_and_report",
+    "on_low_confidence":       "flag_and_continue",
+    "min_requirements":        1,
+    "on_policy_violation":     "flag_and_block",
+    "on_missing_policy_rules": "stop_and_report",
+    "audit_statuses": [
+      "compliant",
+      "non_compliant",
+      "conditionally_compliant",
+      "not_applicable"
+    ],
+    "blocking_statuses": [
+      "non_compliant"
+    ],
+    "_blocking_note": "Any compliance check returning non_compliant blocks the release and halts pipeline progression until remediated."
+  },
+
+  "manifest": {
+    "takes_from": {
+      "shared_folder": {
+        "subfolder": "build_output",
+        "formats": ["json", "docx", "pdf", "html"],
+        "fields": [
+          "release_artefacts",
+          "policy_rules"
+        ],
+        "_note": "Reads release artefacts produced by the Build phase agents. Policy rules are provided by the Policy DB or passed alongside artefacts."
+      }
+    },
+    "returns":            ["compliance_audit_trail", "policy_signoff"],
+    "run_id_required":    true,
+    "run_id_source":      "X-Run-ID header",
+    "thread_id_required": true,
+    "thread_id_source":   "X-Thread-ID header"
+  },
+
+  "inputs": {
+    "release_artefacts": {
+      "required":   true,
+      "type":       "array",
+      "min_items":  1,
+      "description": "Release artefacts from the Build phase — code changes, deployment packages, and build outputs subject to compliance evaluation.",
+      "on_fail":    "stop_and_report"
+    },
+    "policy_rules": {
+      "required":    true,
+      "type":        "array",
+      "min_items":   1,
+      "description": "Compliance policy rules applied to evaluate each release artefact. Sourced from the Policy DB or provided directly alongside the artefacts.",
+      "on_fail":     "stop_and_report"
+    },
+    "project_context": {
+      "required": true,
+      "type":     "object",
+      "on_fail":  "stop_and_report"
+    },
+    "business_case": {
+      "required": true,
+      "type":     "string",
+      "on_fail":  "stop_and_report"
+    },
+    "constraints": {
+      "required":    false,
+      "type":        "object",
+      "description": "Optional additional compliance constraints or scope exceptions applied during audit evaluation.",
+      "on_missing":  "proceed_without"
+    }
+  },
+
+  "outputs": {
+    "compliance_audit_trail": {
+      "type":        "array",
+      "description": "One item per compliance check performed against a release artefact.",
+      "item_schema": {
+        "check_id":     "CA-### sequential",
+        "check_name":   "string",
+        "artefact_ref": "string",
+        "policy_ref":   "string",
+        "status":       "compliant | non_compliant | conditionally_compliant | not_applicable",
+        "evidence":     "string",
+        "description":  "string",
+        "req_id_refs":  ["REQ-### from release_artefacts"]
+      }
+    },
+    "policy_signoff": {
+      "type":        "object",
+      "description": "Aggregated compliance sign-off certifying the release artefacts against all applicable policy rules.",
+      "schema": {
+        "overall_status":      "string",
+        "signoff_authority":   "VA-04",
+        "total_checks":        "integer",
+        "compliant_count":     "integer",
+        "non_compliant_count": "integer",
+        "recommendation":      "proceed | remediate | blocked"
+      }
+    }
+  },
+
+  "skills": {
+    "compliance_audit": {
+      "enabled":     true,
+      "description": "Validates each release artefact against the applicable policy rules and produces a structured compliance check record."
+    },
+    "regulatory_mapping": {
+      "enabled":     true,
+      "description": "Maps each release artefact and change to applicable regulatory frameworks and policy rules from the Policy DB."
+    },
+    "audit_trail_generation": {
+      "enabled":     true,
+      "description": "Generates an immutable, signed audit trail record certifying compliance status across all release artefacts."
+    }
+  },
+
+  "tools": {
+    "compliance_rules_engine": {
+      "enabled":     true,
+      "description": "Evaluates each release artefact against the policy rules and returns a pass/fail compliance status with supporting evidence."
+    },
+    "audit_writer": {
+      "enabled":     true,
+      "description": "Writes the structured compliance audit trail to the shared output folder and git audit repo."
+    },
+    "policy_db": {
+      "enabled":     true,
+      "description": "Queries the Policy DB to retrieve applicable compliance rules for the current project context and release scope."
+    },
+    "signature_service": {
+      "enabled":     true,
+      "description": "Signs the completed compliance audit trail to certify its integrity and authenticity as a CAB-equivalent sign-off."
+    }
+  },
+
+  "supported_formats": {
+    "input":  ["json", "docx", "pdf", "html"],
+    "output": ["json", "docx", "pdf", "html"],
+    "default_output": "json",
+    "freeform_extraction": {
+      "enabled": true,
+      "_note": "Free-form documents (docx/pdf/html) are parsed for text and then an LLM call extracts structured fields. No fixed template required."
+    }
+  },
+
+  "shared_io": {
+    "input_subfolder":  "build_output",
+    "output_subfolder": "compliance_response",
+    "output_filename":  "compliance_audit"
+  },
+
+  "git_reader": {
+    "enabled":           false,
+    "repo_url":          "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":       "ENV:GIT_TOKEN",
+    "branch":            "main",
+    "run_id_source":     "header",
+    "run_id_header":     "X-Run-ID",
+    "read_path_pattern": "runs/{run_id}/{phase}/{agent_id}_output.json",
+    "phase":             "validate",
+    "_enabled_note": "false → read from local files under tech_stack.git_reader.local_audit_dir. true → read from the real audit repo via GitPython. Toggle per environment.",
+    "_note": "run_id is passed by GenWiz as X-Run-ID header on every agent call. Agent uses it to resolve the path and read previous step output."
+  },
+
+  "git_writer": {
+    "repo_url":           "ENV:ADLC_AUDIT_REPO_URL",
+    "auth_method":        "ENV:GIT_TOKEN",
+    "branch":             "main",
+    "write_path_pattern": "runs/{run_id}/validate/compliance_audit_trail.json",
+    "commit_msg_pattern": "feat(VA-04): Compliance Agent · {run_id}"
+  },
+
+  "metadata": {
+    "id":           "VA-04",
+    "version":      "1.0.0",
+    "status":       "ready",
+    "last_updated": "2026-05-20"
+  }
+}
