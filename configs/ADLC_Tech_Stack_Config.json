@@ -62,6 +62,7 @@
       "PL-05": "PL-05_FinOps_Architect_Config.json",
       "DE-03": "DE-03_Data_Design_Config.json",
       "DE-04": "DE-04_Api_Contracts_Config.json",
+      "VA-04": "VA-04_Compliance_Config.json",
       "VA-05": "VA-05_QA_Assurance_Auditor_Config.json"
     },
     "_note": "Add new agent config files here as they are created. PL-00 removed — GenWiz owns orchestration."
@@ -225,7 +226,8 @@
     "agents": [
       "pl01_gap_detection/",
       "de03_data_design/",
-      "de04_api_contracts/"
+      "de04_api_contracts/",
+      "va04_compliance/"
     ],
     "agent_subfiles": [
       "agent.py",

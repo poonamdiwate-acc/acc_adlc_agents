@@ -203,4 +203,5 @@ def bootstrap() -> None:
     from agents.pl05_finops_architect import agent as pl05  # noqa: F401
     from agents.de03_data_design import agent as de03  # noqa: F401
     from agents.de04_api_contracts import agent as de04  # noqa: F401
+    from agents.va04_compliance import agent as va04  # noqa: F401
     from agents.va05_qa_assurance_auditor import agent as va05  # noqa: F401

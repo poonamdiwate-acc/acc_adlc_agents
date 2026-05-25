@@ -27,10 +27,10 @@ Everything else follows from these.
 
 | # | Question | Example answer |
 |---|---|---|
-| 1 | What is the step number? | `9` |
-| 2 | What is the agent name? | `Unit Test Generation` |
-| 3 | What phase? | `design` |
-| 4 | What is a short URL-safe slug for the endpoint? | `unit-test-generation` |
+| 1 | What is the step number? | `2` |
+| 2 | What is the agent name? | ` Test Generation` |
+| 3 | What phase? | `Validate` |
+| 4 | What is a short URL-safe slug for the endpoint? | `test-generation` |
 | 5 | What is a short underscore slug for the MCP tool? | `unit_test_generation` |
 | 6 | What is the previous step — number, agent ID, name? | `8, AD-08, Data Design Agent` |
 | 7 | What is the input folder name in the shared folder? | `bs_docs` |

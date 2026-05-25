@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VA-04 Compliance Audit Report — {{ run_id }}</title>
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px;
+           background: #f0f2f5; color: #1a1a2e; line-height: 1.5; }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .hdr {
+      background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 60%, #0f3460 100%);
+      color: #fff; padding: 28px 40px 22px; position: relative;
+    }
+    .hdr-top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+    .agent-chip {
+      background: #e63946; color: #fff; font-weight: 700; font-size: 11px;
+      padding: 3px 10px; border-radius: 4px; letter-spacing: .8px;
+    }
+    .hdr h1 { font-size: 22px; font-weight: 700; letter-spacing: .3px; }
+    .hdr-sub { font-size: 12px; color: #94a3b8; margin-top: 2px; letter-spacing: .4px; }
+    .rec-pill {
+      position: absolute; top: 28px; right: 40px;
+      padding: 6px 18px; border-radius: 20px; font-weight: 700;
+      font-size: 13px; letter-spacing: .6px;
+    }
+    .rec-blocked  { background: #e63946; color: #fff; }
+    .rec-proceed  { background: #2ecc71; color: #fff; }
+    .rec-remediate{ background: #f39c12; color: #fff; }
+
+    /* ── Meta bar ───────────────────────────────────────────────────────── */
+    .meta-bar {
+      background: #1e2d3d; color: #94a3b8; font-size: 11.5px;
+      padding: 10px 40px; display: flex; gap: 32px; flex-wrap: wrap;
+    }
+    .meta-item strong { color: #e2e8f0; }
+
+    /* ── Summary strip ──────────────────────────────────────────────────── */
+    .summary-strip {
+      display: flex; gap: 14px; padding: 20px 40px; background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .stat-card {
+      flex: 1; border-radius: 8px; padding: 14px 16px; text-align: center;
+      border-top: 3px solid transparent;
+    }
+    .stat-card .num { font-size: 28px; font-weight: 800; }
+    .stat-card .lbl { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                      letter-spacing: .6px; margin-top: 2px; }
+    .sc-total    { background: #f8fafc; border-color: #64748b; color: #334155; }
+    .sc-pass     { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+    .sc-fail     { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+    .sc-warn     { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+    .sc-na       { background: #f8fafc; border-color: #94a3b8; color: #475569; }
+
+    /* ── Main content ───────────────────────────────────────────────────── */
+    .content { padding: 24px 40px; }
+    .section-title {
+      font-size: 15px; font-weight: 700; color: #0f3460;
+      margin-bottom: 16px; padding-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::before {
+      content: ''; display: inline-block; width: 4px; height: 18px;
+      background: #e63946; border-radius: 2px;
+    }
+
+    /* ── Artefact group ─────────────────────────────────────────────────── */
+    .artefact-group { margin-bottom: 24px; border-radius: 8px;
+                      overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .artefact-hdr {
+      background: linear-gradient(135deg, #1e2d3d, #0f3460);
+      color: #fff; padding: 12px 18px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .artefact-chip {
+      background: #e63946; color: #fff; font-weight: 700; font-size: 11px;
+      padding: 2px 9px; border-radius: 4px; letter-spacing: .5px;
+    }
+    .artefact-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .artefact-type {
+      background: rgba(255,255,255,.15); color: #cbd5e1; font-size: 10px;
+      padding: 2px 8px; border-radius: 10px; margin-left: auto;
+    }
+    .artefact-count {
+      color: #94a3b8; font-size: 11px; margin-left: 6px;
+    }
+
+    /* ── Table ──────────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th {
+      background: #f1f5f9; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px; color: #475569;
+      padding: 9px 14px; text-align: left; border-bottom: 2px solid #e2e8f0;
+    }
+    td { padding: 11px 14px; border-bottom: 1px solid #f1f5f9;
+         vertical-align: top; font-size: 12.5px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* Row tints */
+    tr.row-fail td { background: #fff5f5; }
+    tr.row-fail:hover td { background: #fee2e2; }
+    tr.row-warn td { background: #fffdf0; }
+    tr.row-warn:hover td { background: #fef3c7; }
+
+    /* ── Status badge ───────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .badge-pass  { background: #dcfce7; color: #166534; }
+    .badge-pass .dot  { background: #22c55e; }
+    .badge-fail  { background: #fee2e2; color: #991b1b; }
+    .badge-fail .dot  { background: #ef4444; }
+    .badge-warn  { background: #fef3c7; color: #92400e; }
+    .badge-warn .dot  { background: #f59e0b; }
+    .badge-na    { background: #f1f5f9; color: #475569; }
+    .badge-na .dot    { background: #94a3b8; }
+
+    .violation-flag {
+      display: inline-block; margin-top: 5px;
+      background: #fee2e2; color: #991b1b; font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 4px; border: 1px solid #fca5a5;
+    }
+
+    /* ── Evidence cell ──────────────────────────────────────────────────── */
+    .ev-evidence { color: #374151; margin-bottom: 4px; }
+    .ev-desc     { color: #6b7280; font-style: italic; font-size: 12px; }
+
+    /* ── Check ID ───────────────────────────────────────────────────────── */
+    .check-id {
+      font-family: 'Courier New', monospace; font-size: 11.5px;
+      font-weight: 700; color: #0f3460;
+      background: #eff6ff; padding: 2px 7px; border-radius: 4px;
+    }
+
+    /* ── Policy ref ─────────────────────────────────────────────────────── */
+    .pol-ref {
+      font-family: 'Courier New', monospace; font-size: 11.5px;
+      color: #1e40af; background: #dbeafe; padding: 2px 7px; border-radius: 4px;
+    }
+
+    /* ── Reg tags ───────────────────────────────────────────────────────── */
+    .reg-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .reg-tag {
+      font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+      background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe;
+      white-space: nowrap;
+    }
+
+    /* ── Sign-off card ──────────────────────────────────────────────────── */
+    .signoff-card {
+      border-radius: 10px; overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12); margin-top: 8px;
+    }
+    .signoff-hdr {
+      padding: 22px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .signoff-hdr-blocked  { background: linear-gradient(135deg, #991b1b, #e63946); color: #fff; }
+    .signoff-hdr-proceed  { background: linear-gradient(135deg, #14532d, #22c55e); color: #fff; }
+    .signoff-hdr-remediate{ background: linear-gradient(135deg, #78350f, #f59e0b); color: #fff; }
+    .signoff-verdict { font-size: 24px; font-weight: 800; letter-spacing: 1px; }
+    .signoff-note    { font-size: 12px; opacity: .85; margin-top: 4px; }
+    .signoff-authority {
+      text-align: right;
+    }
+    .signoff-authority .lbl { font-size: 11px; opacity: .7; }
+    .signoff-authority .val { font-size: 18px; font-weight: 700; }
+
+    .signoff-stats {
+      background: #fff; display: flex; border-top: 1px solid #e2e8f0;
+    }
+    .ss-cell {
+      flex: 1; text-align: center; padding: 16px 10px;
+      border-right: 1px solid #f1f5f9;
+    }
+    .ss-cell:last-child { border-right: none; }
+    .ss-num { font-size: 22px; font-weight: 800; }
+    .ss-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase;
+              letter-spacing: .5px; color: #6b7280; margin-top: 2px; }
+    .ss-total { color: #334155; }
+    .ss-pass  { color: #166534; }
+    .ss-fail  { color: #991b1b; }
+    .ss-warn  { color: #92400e; }
+    .ss-na    { color: #475569; }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    .footer {
+      text-align: center; padding: 18px 40px;
+      color: #94a3b8; font-size: 11px; border-top: 1px solid #e2e8f0;
+      background: #fff; margin-top: 24px;
+    }
+
+    /* ── Check name ─────────────────────────────────────────────────────── */
+    .check-name { font-weight: 600; color: #1e293b; font-size: 12.5px; }
+  </style>
+</head>
+<body>
+
+{# ── Pre-compute counts ────────────────────────────────────────────────── #}
+{% set trail         = compliance_audit_trail %}
+{% set signoff       = policy_signoff %}
+{% set rec           = signoff.recommendation | default('blocked') %}
+{% set not_app_count = trail | selectattr('status','equalto','not_applicable') | list | length %}
+
+{# ── Header ────────────────────────────────────────────────────────────── #}
+<div class="hdr">
+  <div class="hdr-top">
+    <span class="agent-chip">VA-04</span>
+    <h1>Compliance Audit Report</h1>
+  </div>
+  <div class="hdr-sub">Validate Phase &nbsp;·&nbsp; Autonomous CAB Replacement &nbsp;·&nbsp; ADLC Pipeline</div>
+  <span class="rec-pill rec-{{ rec }}">{{ rec | upper }}</span>
+</div>
+
+{# ── Meta bar ──────────────────────────────────────────────────────────── #}
+<div class="meta-bar">
+  <span class="meta-item"><strong>Run ID</strong>&nbsp;&nbsp;{{ run_id }}</span>
+  <span class="meta-item"><strong>Agent</strong>&nbsp;&nbsp;{{ agent_id }}</span>
+  <span class="meta-item"><strong>Sign-off Authority</strong>&nbsp;&nbsp;{{ signoff.signoff_authority | default('VA-04') }}</span>
+  <span class="meta-item"><strong>Overall Status</strong>&nbsp;&nbsp;{{ signoff.overall_status | default('') | replace('_',' ') | title }}</span>
+</div>
+
+{# ── Summary strip ─────────────────────────────────────────────────────── #}
+<div class="summary-strip">
+  <div class="stat-card sc-total">
+    <div class="num">{{ signoff.total_checks | default(0) }}</div>
+    <div class="lbl">Total Checks</div>
+  </div>
+  <div class="stat-card sc-pass">
+    <div class="num">{{ signoff.compliant_count | default(0) }}</div>
+    <div class="lbl">Compliant</div>
+  </div>
+  <div class="stat-card sc-fail">
+    <div class="num">{{ signoff.non_compliant_count | default(0) }}</div>
+    <div class="lbl">Non-Compliant</div>
+  </div>
+  <div class="stat-card sc-warn">
+    <div class="num">{{ signoff.conditionally_compliant_count | default(0) }}</div>
+    <div class="lbl">Conditional</div>
+  </div>
+  <div class="stat-card sc-na">
+    <div class="num">{{ not_app_count }}</div>
+    <div class="lbl">Not Applicable</div>
+  </div>
+</div>
+
+{# ── Audit trail ───────────────────────────────────────────────────────── #}
+<div class="content">
+  <div class="section-title">Compliance Audit Trail</div>
+
+  {% for artefact_id, checks in artefact_groups.items() %}
+  <div class="artefact-group">
+    <div class="artefact-hdr">
+      <span class="artefact-chip">{{ artefact_id }}</span>
+      <span class="artefact-name">{{ checks[0].artefact_type | default('release artefact') }}</span>
+      <span class="artefact-type">{{ checks[0].artefact_type | default('') }}</span>
+      <span class="artefact-count">{{ checks | length }} check{{ 's' if checks | length != 1 else '' }}</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:80px">Check ID</th>
+          <th style="width:200px">Check Name</th>
+          <th style="width:120px">Policy Ref</th>
+          <th style="width:150px">Status</th>
+          <th>Evidence &amp; Description</th>
+          <th style="width:130px">Regulatory Refs</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for check in checks %}
+        {% if check.status == 'non_compliant' %}
+          {% set row_class = 'row-fail' %}
+          {% set badge_class = 'badge-fail' %}
+          {% set badge_label = 'NON-COMPLIANT' %}
+        {% elif check.status == 'conditionally_compliant' %}
+          {% set row_class = 'row-warn' %}
+          {% set badge_class = 'badge-warn' %}
+          {% set badge_label = 'CONDITIONAL' %}
+        {% elif check.status == 'compliant' %}
+          {% set row_class = '' %}
+          {% set badge_class = 'badge-pass' %}
+          {% set badge_label = 'COMPLIANT' %}
+        {% else %}
+          {% set row_class = '' %}
+          {% set badge_class = 'badge-na' %}
+          {% set badge_label = 'NOT APPLICABLE' %}
+        {% endif %}
+        <tr class="{{ row_class }}">
+          <td><span class="check-id">{{ check.check_id }}</span></td>
+          <td><span class="check-name">{{ check.check_name }}</span></td>
+          <td><span class="pol-ref">{{ check.policy_ref }}</span></td>
+          <td>
+            <span class="badge {{ badge_class }}">
+              <span class="dot"></span>{{ badge_label }}
+            </span>
+            {% if check.policy_violation %}
+            <br/><span class="violation-flag">&#9888; Policy Violation</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="ev-evidence">{{ check.evidence }}</div>
+            {% if check.description %}
+            <div class="ev-desc">{{ check.description }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <div class="reg-tags">
+              {% for ref in check.req_id_refs %}
+                <span class="reg-tag">{{ ref }}</span>
+              {% endfor %}
+              {% if not check.req_id_refs %}
+                <span style="color:#94a3b8;font-size:11px">—</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+  {# ── Policy sign-off ─────────────────────────────────────────────────── #}
+  <div class="section-title" style="margin-top:32px">Policy Sign-Off</div>
+  <div class="signoff-card">
+    <div class="signoff-hdr signoff-hdr-{{ rec }}">
+      <div>
+        <div class="signoff-verdict">{{ rec | upper }}</div>
+        <div class="signoff-note">
+          {% if rec == 'blocked' %}
+            One or more non-compliant findings detected. Release is blocked pending remediation.
+          {% elif rec == 'remediate' %}
+            Conditional findings present. Remediation required before build phase can proceed.
+          {% else %}
+            All compliance checks passed. Release is cleared to proceed to the Build phase.
+          {% endif %}
+        </div>
+      </div>
+      <div class="signoff-authority">
+        <div class="lbl">Sign-off Authority</div>
+        <div class="val">{{ signoff.signoff_authority | default('VA-04') }}</div>
+      </div>
+    </div>
+    <div class="signoff-stats">
+      <div class="ss-cell ss-total">
+        <div class="ss-num">{{ signoff.total_checks | default(0) }}</div>
+        <div class="ss-lbl">Total Checks</div>
+      </div>
+      <div class="ss-cell ss-pass">
+        <div class="ss-num">{{ signoff.compliant_count | default(0) }}</div>
+        <div class="ss-lbl">Compliant</div>
+      </div>
+      <div class="ss-cell ss-fail">
+        <div class="ss-num">{{ signoff.non_compliant_count | default(0) }}</div>
+        <div class="ss-lbl">Non-Compliant</div>
+      </div>
+      <div class="ss-cell ss-warn">
+        <div class="ss-num">{{ signoff.conditionally_compliant_count | default(0) }}</div>
+        <div class="ss-lbl">Conditional</div>
+      </div>
+      <div class="ss-cell ss-na">
+        <div class="ss-num">{{ not_app_count }}</div>
+        <div class="ss-lbl">Not Applicable</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Footer ────────────────────────────────────────────────────────────── #}
+<div class="footer">
+  VA-04 &nbsp;·&nbsp; Compliance Agent &nbsp;·&nbsp; ADLC Validate Phase &nbsp;·&nbsp;
+  Run: {{ run_id }} &nbsp;·&nbsp; Autonomous CAB Replacement
+</div>
+
+</body>
+</html>
