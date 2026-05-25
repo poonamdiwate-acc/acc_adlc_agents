@@ -1,0 +1,316 @@
+{
+  "agent": {
+    "id": "VA-05",
+    "name": "QA Assurance Auditor",
+    "version": "1.0.0",
+    "description": "Independent Quality Assurance agent that reviews the compliance audit trail and exception flags produced by upstream Validate-phase agents. Assures the validation process — does not execute tests or remediate defects. Produces an immutable Assurance Sign-off attestation and a consolidated Exception Log per cycle.",
+    "phase": "validate",
+    "standalone": true,
+    "endpoint": "/agents/qa-assurance-auditor",
+    "mcp_tool_name": "run_qa_assurance_auditor",
+    "skill_file": "VA-05_QA_Assurance_Auditor.md"
+  },
+  "llm_config_override": {
+    "max_tokens": 16384,
+    "timeout_seconds": 180
+  },
+  "behaviour": {
+    "on_empty_audit_trail": "stop_and_report",
+    "on_missing_evidence": "escalate_never_accept",
+    "on_audit_gap": "block_signoff",
+    "on_sla_breach": "block_signoff",
+    "on_low_confidence": "flag_and_continue",
+    "on_missing_optional_input": "record_in_input_completeness",
+    "_partial_input_note": "When optional inputs are absent, defaults are applied (exception_flags=[], business_case=\"\") and the sign-off is downgraded from clean→qualified. The assurance_summary.input_completeness block records what was missing.",
+    "min_audit_entries": 1,
+    "disposition_values": [
+      "Accepted",
+      "Rejected",
+      "Escalated"
+    ],
+    "_disposition_note": "Per FR-2.3 — every exception receives exactly one disposition. Never auto-accept without attributable evidence (FR-2.5).",
+    "audit_finding_types": [
+      "missing_record",
+      "duplicate_record",
+      "out_of_sequence",
+      "signature_invalid",
+      "checkpoint_not_covered",
+      "untraceable_entry"
+    ],
+    "severity_levels": [
+      "critical",
+      "high",
+      "medium",
+      "low"
+    ],
+    "blocking_severities": [
+      "critical",
+      "high"
+    ],
+    "_blocking_note": "critical and high audit findings block sign-off issuance per NFR-3 / FR-3.3.",
+    "overall_assurance_values": [
+      "clean",
+      "qualified",
+      "blocked"
+    ],
+    "recommendation_values": [
+      "proceed",
+      "proceed_with_escalation",
+      "hold_for_remediation"
+    ],
+    "immutability": {
+      "enforce": true,
+      "_note": "Sign-off artifacts are sealed on issuance (NFR-3). Re-issue with same signoff_id returns 409. Corrections require a new version with incremented `version` field."
+    },
+    "independence": {
+      "enforce": true,
+      "_note": "NFR-1 — agent MUST NOT execute tests, remediate defects, or author policy. Test-execution requests are rejected and logged to meta-audit."
+    }
+  },
+  "manifest": {
+    "takes_from": {
+      "source": "shared_folder",
+      "formats": ["json", "docx", "pdf", "html"],
+      "fields": [
+        "audit_trail",
+        "exception_flags",
+        "checkpoint_expectations",
+        "project_context",
+        "business_case"
+      ]
+    },
+    "returns": [
+      "assurance_signoff",
+      "exception_log",
+      "audit_findings",
+      "assurance_summary"
+    ],
+    "run_id_required": true,
+    "run_id_source": "X-Run-ID header",
+    "thread_id_required": true,
+    "thread_id_source": "X-Thread-ID header"
+  },
+  "inputs": {
+    "audit_trail": {
+      "required": true,
+      "type": "array",
+      "source": "shared_folder",
+      "min_items": 1,
+      "on_fail": "stop_and_report",
+      "item_expected_fields": ["entry_id", "timestamp", "control_ref", "actor", "signature"],
+      "_note": "Structured, timestamped, signed log entries from the Compliance Agent (BRD §5.1)."
+    },
+    "exception_flags": {
+      "required": false,
+      "type": "array",
+      "source": "shared_folder",
+      "on_missing": "proceed_with_empty",
+      "default": [],
+      "item_expected_fields": ["exception_id", "severity", "source_control", "evidence_refs"],
+      "_note": "Optional. Missing or empty array is valid — empty means 'no exceptions raised this cycle'. Tracked in assurance_summary.input_completeness."
+    },
+    "project_context": {
+      "required": true,
+      "type": "object",
+      "on_fail": "stop_and_report",
+      "expected_fields": ["cycle_id"],
+      "soft_fields": ["domain", "market", "project_name", "sla_seconds"],
+      "_note": "cycle_id is structurally required (binds the signoff_id to a cycle). soft_fields are defaulted/warned when absent and recorded in input_completeness."
+    },
+    "business_case": {
+      "required": false,
+      "type": "string",
+      "on_missing": "proceed_without",
+      "default": "",
+      "_note": "Optional. LLM context only — no deterministic check depends on it. Tracked in assurance_summary.input_completeness."
+    },
+    "checkpoint_expectations": {
+      "required": false,
+      "type": "object",
+      "on_missing": "proceed_without",
+      "_note": "Per FR-1.4 — when provided, every checkpoint must be cross-referenced. When absent, set checkpoint_coverage: skipped in the sign-off."
+    }
+  },
+  "outputs": {
+    "assurance_signoff": {
+      "type": "object",
+      "description": "Single immutable attestation per cycle. Null when overall_assurance is 'blocked'.",
+      "schema": {
+        "signoff_id": "SIGN-YYYY-MM-DD-### sequential",
+        "cycle_id": "string — from project_context.cycle_id",
+        "issued_at": "ISO-8601 timestamp",
+        "issued_by": "VA-05",
+        "audit_integrity": "verified | findings_raised | unverifiable",
+        "checkpoint_coverage": "complete | partial | skipped",
+        "exceptions_reviewed": "integer",
+        "exceptions_accepted": "integer",
+        "exceptions_rejected": "integer",
+        "exceptions_escalated": "integer",
+        "process_attestation": "string — process-followed attestation language only; not a defect-free claim",
+        "blocking_findings": "array of finding_ids",
+        "version": "semver string",
+        "immutable": true
+      }
+    },
+    "exception_log": {
+      "type": "array",
+      "description": "One item per exception reviewed. Consolidates dispositions for the cycle (FR-3.2).",
+      "item_schema": {
+        "exception_id": "string — from input exception_flags",
+        "source_control": "string — control reference",
+        "severity": "critical | high | medium | low",
+        "disposition": "Accepted | Rejected | Escalated",
+        "rationale": "string — reviewer rationale (FR-2.4)",
+        "evidence_refs": "array — evidence reference IDs",
+        "audit_trail_ref": "string — linked audit entry_id (NFR-2)",
+        "reviewed_at": "ISO-8601 timestamp",
+        "reviewer": "VA-05",
+        "escalation_target": "string or null — populated only when disposition is Escalated"
+      }
+    },
+    "audit_findings": {
+      "type": "array",
+      "description": "Findings raised against the audit trail itself per FR-1.3. Empty array when the trail is clean.",
+      "item_schema": {
+        "finding_id": "FIND-### sequential",
+        "finding_type": "one of audit_finding_types",
+        "severity": "critical | high | medium | low",
+        "description": "string — specific, names the affected control and the exact problem",
+        "control_ref": "string — control identifier or null",
+        "recommendation": "string — actionable remediation"
+      }
+    },
+    "assurance_summary": {
+      "type": "object",
+      "description": "Aggregated summary of audit review and exception disposition outcomes for the cycle.",
+      "schema": {
+        "audit_entries_reviewed": "integer",
+        "audit_findings_raised": "integer",
+        "exceptions_reviewed": "integer",
+        "dispositions_by_type": {
+          "Accepted": "integer",
+          "Rejected": "integer",
+          "Escalated": "integer"
+        },
+        "overall_assurance": "clean | qualified | blocked",
+        "recommendation": "proceed | proceed_with_escalation | hold_for_remediation"
+      }
+    }
+  },
+  "skills": {
+    "audit_review": {
+      "enabled": true,
+      "description": "Ingests the compliance audit trail and verifies chronological integrity, completeness, and traceability. Detects missing, duplicate, or out-of-sequence audit records. Cross-references entries against checkpoint_expectations (FR-1.1–1.4)."
+    },
+    "exception_signoff": {
+      "enabled": true,
+      "description": "Evaluates each exception against acceptance criteria and supporting evidence. Produces one disposition per exception with rationale and evidence references. Never auto-accepts an exception lacking attributable evidence (FR-2.1–2.5)."
+    },
+    "assurance_documentation": {
+      "enabled": true,
+      "description": "Produces the immutable Assurance Sign-off attestation and the consolidated Exception Log. Documents are sealed on issuance per NFR-3 (FR-3.1–3.4).",
+      "immutability_enforced": true
+    }
+  },
+  "tools": {
+    "audit_dashboard": {
+      "enabled": true,
+      "access": "read_only",
+      "description": "Read access to the consolidated audit trail data emitted by the Compliance Agent. Used by audit_review to traverse timestamped, signed entries (BRD §4)."
+    },
+    "exception_viewer": {
+      "enabled": true,
+      "access": "read_only",
+      "description": "Inspects exception flags, supporting evidence, and lineage from Quality Engineering. Used by exception_signoff to evaluate each exception."
+    },
+    "assurance_logger": {
+      "enabled": true,
+      "access": "write",
+      "description": "Writes the Assurance Sign-off attestation and Exception Log entries. Once written, artifacts are sealed and immutable.",
+      "on_unreachable": "queue_and_replay",
+      "queue_subfolder": "_pending"
+    }
+  },
+  "non_functional": {
+    "independence": {
+      "id": "NFR-1",
+      "rule": "must_not_execute_tests_or_remediate",
+      "enforcement": "meta_audit_logged"
+    },
+    "traceability": {
+      "id": "NFR-2",
+      "rule": "every_disposition_links_to_source_exception_and_audit_entry"
+    },
+    "immutability": {
+      "id": "NFR-3",
+      "rule": "signoff_artifacts_sealed_on_issuance",
+      "correction_method": "new_version"
+    },
+    "auditability": {
+      "id": "NFR-4",
+      "rule": "log_all_va05_actions_for_meta_audit",
+      "meta_audit_subfolder": "_meta_audit"
+    },
+    "timeliness": {
+      "id": "NFR-5",
+      "rule": "signoff_within_cycle_sla",
+      "sla_source": "project_context.sla_seconds",
+      "on_breach": "block_signoff"
+    },
+    "security": {
+      "id": "NFR-6",
+      "rule": "least_privilege",
+      "audit_dashboard_access": "read_only",
+      "exception_viewer_access": "read_only",
+      "assurance_logger_access": "write"
+    },
+    "confidentiality": {
+      "id": "NFR-7",
+      "rule": "handle_per_data_classification",
+      "_note": "Per logging._security_note — never log raw audit content or business_case in prod."
+    }
+  },
+  "acceptance_criteria_refs": [
+    "AC-01: one assurance_signoff per cycle_id (FR-3.1)",
+    "AC-02: one exception_log per cycle (FR-3.2)",
+    "AC-03: zero Accepted dispositions without evidence_refs (FR-2.5)",
+    "AC-04: every disposition links to exception_id AND audit_trail_ref (NFR-2)",
+    "AC-05: disposition values restricted to Accepted|Rejected|Escalated (FR-2.3)",
+    "AC-06: rationale + reviewed_at populated on every disposition (FR-2.4)",
+    "AC-07: audit_findings raised for missing/duplicate/out-of-sequence records (FR-1.3)",
+    "AC-08: checkpoint coverage cross-referenced when provided (FR-1.4)",
+    "AC-09: signoff immutable; re-write rejected with 409 (FR-3.3, NFR-3)",
+    "AC-10: signoff issued within cycle SLA (FR-3.4, NFR-5)",
+    "AC-11: no test execution actions emitted (NFR-1, verified via meta-audit)",
+    "AC-12: multi-format input (json/docx/pdf/html)",
+    "AC-13: multi-format output (json/docx/pdf/html)",
+    "AC-14: outputs persisted to qa_assurance/ subfolder",
+    "AC-15: request without X-Thread-ID rejected with 422",
+    "AC-16: every VA-05 action logged for meta-audit (NFR-4)"
+  ],
+  "metadata": {
+    "id": "VA-05",
+    "version": "1.0.0",
+    "status": "draft",
+    "last_updated": "2026-05-21",
+    "source_brd": "VA-05_Requirements.md v1.0",
+    "_note": "Generated from AGENT_CONFIG_TEMPLATE.json against VA-05 BRD. Phase: validate. Step: 5."
+  },
+  "supported_formats": {
+    "input": ["json", "docx", "pdf", "html"],
+    "output": ["json", "docx", "pdf", "html"],
+    "default_output": "json",
+    "freeform_extraction": {
+      "enabled": true,
+      "_note": "Free-form docs (docx/pdf/html) are text-extracted, then an LLM call structures them into the expected fields (audit_trail, exception_flags, checkpoint_expectations, project_context)."
+    }
+  },
+  "shared_io": {
+    "input_subfolder": "qa_inputs",
+    "output_subfolder": "qa_assurance"
+  },
+  "git_reader": {
+    "enabled": false,
+    "_note": "Disabled — all input comes from shared_folder. Kept for backward compatibility with agent init code."
+  }
+}
